@@ -240,7 +240,7 @@ def unequal_class_size_noniid_dirichlet(dataset, alpha, num_clients, num_classes
         np.random.shuffle(label_k)
         example_indices.append(label_k)
 
-    example_indices = np.array(example_indices)
+    example_indices = np.array(example_indices, dtype=object)
 
     client_samples = [[] for _ in range(num_clients)]
     count = np.zeros(num_classes).astype(int)
