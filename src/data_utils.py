@@ -30,7 +30,7 @@ def get_dataset(args):
     Returns train, validation and test datasets
     """
     if args.dataset == 'cifar10' or args.dataset == 'cifar100':
-        data_dir = './'
+        data_dir = '../'
 
         transform_train = transforms.Compose([
             transforms.RandomCrop(32, padding=4),
@@ -55,7 +55,7 @@ def get_dataset(args):
             test_dataset = datasets.CIFAR100(data_dir, train=False, download=False, transform=transform_test)
 
     elif args.dataset == 'femnist':
-        data_dir = './data/femnist/'
+        data_dir = '../data/femnist/'
         train_dataset = FEMNIST(root=data_dir, train=True, download=True)
         mean = train_dataset.train_data.float().mean()
         std = train_dataset.train_data.float().std()
@@ -79,7 +79,7 @@ def get_dataset(args):
             transforms.Normalize((0.1307,), (0.3081,))])
 
         if args.dataset == 'mnist':
-            data_dir = './data/mnist/'
+            data_dir = '../data/mnist/'
             train_dataset = datasets.MNIST(data_dir, train=True, download=False, transform=apply_transform)
             validation_dataset = datasets.MNIST(data_dir, train=True, download=False, transform=apply_transform)
             test_dataset = datasets.MNIST(data_dir, train=False, download=False, transform=apply_transform)
