@@ -30,7 +30,7 @@ def get_dataset(args):
     Returns train, validation and test datasets
     """
     if args.dataset == 'cifar10' or args.dataset == 'cifar100':
-        data_dir = '../'
+        data_dir = '../data/'
 
         transform_train = transforms.Compose([
             transforms.RandomCrop(32, padding=4),
@@ -45,14 +45,14 @@ def get_dataset(args):
         ])
 
         if args.dataset == 'cifar10':
-            train_dataset = datasets.CIFAR10(data_dir, train=True, download=True, transform=transform_train)
-            validation_dataset = datasets.CIFAR10(data_dir, train=True, download=False, transform=transform_test)
-            test_dataset = datasets.CIFAR10(data_dir, train=False, download=False, transform=transform_test)
+            train_dataset = datasets.CIFAR10(f'{data_dir}{args.dataset}/', train=True, download=True, transform=transform_train)
+            validation_dataset = datasets.CIFAR10(f'{data_dir}{args.dataset}/', train=True, download=False, transform=transform_test)
+            test_dataset = datasets.CIFAR10(f'{data_dir}{args.dataset}/', train=False, download=False, transform=transform_test)
 
         if args.dataset == 'cifar100':
-            train_dataset = datasets.CIFAR100(data_dir, train=True, download=True, transform=transform_train)
-            validation_dataset = datasets.CIFAR100(data_dir, train=True, download=False, transform=transform_test)
-            test_dataset = datasets.CIFAR100(data_dir, train=False, download=False, transform=transform_test)
+            train_dataset = datasets.CIFAR100(f'{data_dir}{args.dataset}/', train=True, download=True, transform=transform_train)
+            validation_dataset = datasets.CIFAR100(f'{data_dir}{args.dataset}/', train=True, download=False, transform=transform_test)
+            test_dataset = datasets.CIFAR100(f'{data_dir}{args.dataset}/', train=False, download=False, transform=transform_test)
 
     elif args.dataset == 'femnist':
         data_dir = '../data/femnist/'
