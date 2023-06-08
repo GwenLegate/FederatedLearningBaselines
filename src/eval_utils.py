@@ -70,6 +70,7 @@ def test_inference(args, model, test_dataset, num_workers):
         total += len(labels)
 
     accuracy = correct/total
+    loss = loss/batch_idx
     return accuracy, loss
 
 def test_model(args, model_path):

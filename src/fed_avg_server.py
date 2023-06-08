@@ -18,7 +18,8 @@ class FedAvgServer(object):
 
     def start_server(self):
         # create dir to save run artifacts
-        run_dir = f'/scratch/{os.environ.get("USER", "glegate")}/{self.args.wandb_run_name}'
+        #run_dir = f'/scratch/{os.environ.get("USER", "glegate")}/{self.args.wandb_run_name}'
+        run_dir = './run_data/'
         if not os.path.isdir(run_dir):
             os.makedirs(run_dir, mode=0o755, exist_ok=True)
 
@@ -29,7 +30,7 @@ class FedAvgServer(object):
         # splits dataset among clients
         user_groups = split_dataset(train_dataset, self.args)
         # save the user_groups dictionary for later access
-        user_groups_to_save = f'/scratch/{os.environ.get("USER", "glegate")}/{self.args.wandb_run_name}/user_groups.pt'
+        user_groups_to_save = f'{run_dir}/user_groups.pt'
         torch.save(user_groups, user_groups_to_save)
         # list of set of labels present for each client
         client_labels = get_client_labels(train_dataset, user_groups, self.args.num_workers, self.args.num_classes)
@@ -48,7 +49,7 @@ class FedAvgServer(object):
 
         # set up wandb connection
         if self.args.wandb:
-            wandb_setup(self.args, global_model)
+            wandb_setup(self.args, global_model, run_dir)
 
         run_summary(self.args)
 
@@ -84,7 +85,8 @@ class FedAvgServer(object):
 
             if epoch % 50 == 0:
                 # save model as a backup every 50 epochs
-                model_path = f'/scratch/{os.environ.get("USER", "glegate")}/{self.args.wandb_run_name}/global_model.pt'
+                # model_path = f'/scratch/{os.environ.get("USER", "glegate")}/{self.args.wandb_run_name}/global_model.pt'
+                model_path = f'{run_dir}/global_model.pt'
                 torch.save(global_model.state_dict(), model_path)
 
             # Test global model inference on validation set after each round use model save criteria
@@ -112,7 +114,8 @@ class FedAvgServer(object):
             epoch += 1
 
         # save final model after training
-        model_path = f'/scratch/{os.environ.get("USER", "glegate")}/{self.args.wandb_run_name}/global_model.pt'
+        # model_path = f'/scratch/{os.environ.get("USER", "glegate")}/{self.args.wandb_run_name}/global_model.pt'
+        model_path = f'{run_dir}/global_model.pt'
         torch.save(global_model.state_dict(), model_path)
 
         # Test inference after completion of training

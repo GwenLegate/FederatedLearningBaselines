@@ -11,7 +11,7 @@ import torch
 from torch.utils.data import DataLoader
 import os
 import numpy as np
-from src.models import ResNet34, ResNet18
+from src.models import ResNet34, ResNet18, ResNet50, ResNet101, ResNet152
 
 def average_weights(w):
     """
@@ -123,7 +123,7 @@ def run_summary(args):
           f'\tlr: {args.client_lr}\n'
           f'\tiid: {args.iid}\n'
           f'\tclients: {args.num_clients}\n'
-          f'\tfrcation of clients selected: {args.frac}\n'
+          f'\tfraction of clients selected: {args.frac}\n'
           f'\tlocal bs: {args.local_bs}\n'
           f'\tlocal epochs: {args.local_ep}\n'
           f'\tlocal iterations: {args.local_iters}\n'
@@ -131,7 +131,7 @@ def run_summary(args):
           f'\tnorm: {args.norm}\n'
           f'\tdataset: {args.dataset}')
 
-def wandb_setup(args, model):
+def wandb_setup(args, model, run_dir, central=False):
     if args.wandb_run_name:
         os.environ['WANDB_NAME'] = args.wandb_run_name
         os.environ['WANDB_START_METHOD'] = "thread"
@@ -140,31 +140,42 @@ def wandb_setup(args, model):
 
     # need to set wandb run_dir to something I can access to avoid permission denied error.
     # See https://github.com/wandb/client/issues/3437
-    wandb_path = f'/scratch/{os.environ.get("USER","glegate")}/wandb'
+    # wandb_path = f'/scratch/{os.environ.get("USER","glegate")}/wandb'
+    wandb_path = f'{run_dir}/wandb'
     if not os.path.isdir(wandb_path):
-        os.makedirs(wandb_path, mode=0o755, exist_ok=True)
+        os.makedirs(wandb_path, mode=0o755, exist_ok=True,)
 
     # if using wandb check project and entity are set
     assert not args.wandb_project == '' and not args.wandb_entity == ''
     wandb.login()
     wandb.init(dir=wandb_path, project=args.wandb_project, entity=args.wandb_entity)
-    general_args = {
-        "client learning_rate": args.client_lr,
-        "epochs": args.epochs,
-        "dataset": args.dataset,
-        "model": args.model,
-        "iid": args.iid,
-        "clients": args.num_clients,
-        "fraction of clients (C)": args.frac,
-        "local epochs (E)": args.local_ep,
-        "local iters": args.local_iters,
-        "local batch size (B)": args.local_bs,
-        "optimizer": args.optimizer,
-        "dirichlet": args.dirichlet,
-        "alpha": args.alpha,
-        "norm": args.norm,
-        "decay": args.decay,
-    }
+    if central:
+        general_args = {
+            "client learning_rate": args.client_lr,
+            "epochs": args.epochs,
+            "dataset": args.dataset,
+            "model": args.model,
+            "norm": args.norm,
+        }
+        pass
+    else:
+        general_args = {
+            "client learning_rate": args.client_lr,
+            "epochs": args.epochs,
+            "dataset": args.dataset,
+            "model": args.model,
+            "iid": args.iid,
+            "clients": args.num_clients,
+            "fraction of clients (C)": args.frac,
+            "local epochs (E)": args.local_ep,
+            "local iters": args.local_iters,
+            "local batch size (B)": args.local_bs,
+            "optimizer": args.optimizer,
+            "dirichlet": args.dirichlet,
+            "alpha": args.alpha,
+            "norm": args.norm,
+            "decay": args.decay,
+        }
     wandb.config.update(general_args)
 
     # log every 'print_every' epochs
@@ -177,6 +188,12 @@ def get_model(args):
         return ResNet18(args=args)
     elif args.model == 'resnet34':
         return ResNet34(args=args)
+    elif args.model == 'resnet50':
+        return ResNet50(args=args)
+    elif args.model == 'resnet101':
+        return ResNet101(args=args)
+    elif args.model == 'resnet152':
+        return ResNet152(args=args)
     else:
         exit('Error: unrecognized model')
 

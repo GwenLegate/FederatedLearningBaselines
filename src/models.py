@@ -12,16 +12,20 @@ class ResNet(nn.Module):
         self.block_nums = block_nums
         self.channels = [32, 64, 128, 256]
         self.channels = [i * self.width for i in self.channels]
+        if args.model in ['resnet50', 'resnet101', 'resnet152']:
+            self.block = Bottleneck
+        else:
+            self.block = ResidualBlock
 
         self.conv1 = nn.Sequential(
             nn.Conv2d(in_channels=args.num_channels, out_channels=self.channels[0], kernel_size=3, padding=1, stride=1),
             norm2d(self.channels[0], args.norm),
             nn.ReLU(inplace=True)
         )
-        self.layer_1 = self.make_layer(ResidualBlock, self.channels[0], self.channels[0], stride=1, norm=args.norm, block_num=self.block_nums[0])
-        self.layer_2 = self.make_layer(ResidualBlock, self.channels[0], self.channels[1], stride=2, norm=args.norm, block_num=self.block_nums[1])
-        self.layer_3 = self.make_layer(ResidualBlock, self.channels[1], self.channels[2], stride=2, norm=args.norm, block_num=self.block_nums[2])
-        self.layer_4 = self.make_layer(ResidualBlock, self.channels[2], self.channels[3], stride=2, norm=args.norm, block_num=self.block_nums[3])
+        self.layer_1 = self.make_layer(self.block, self.channels[0], self.channels[0], stride=1, norm=args.norm, block_num=self.block_nums[0])
+        self.layer_2 = self.make_layer(self.block, self.channels[0], self.channels[1], stride=2, norm=args.norm, block_num=self.block_nums[1])
+        self.layer_3 = self.make_layer(self.block, self.channels[1], self.channels[2], stride=2, norm=args.norm, block_num=self.block_nums[2])
+        self.layer_4 = self.make_layer(self.block, self.channels[2], self.channels[3], stride=2, norm=args.norm, block_num=self.block_nums[3])
         self.avgpool = nn.AvgPool2d((3, 3), stride=2)
         self.fc = nn.Linear(self.channels[3] * 1 * 1, args.num_classes)
 
@@ -45,15 +49,27 @@ class ResNet(nn.Module):
         return nn.Sequential(*layers)
 
 def ResNet18(args):
-    return ResNet(args, [2, 2, 2, 2])
+    return ResNet(args, [2, 2, 2, 2],)
 
 
 def ResNet34(args):
-    return ResNet(args, [3, 4, 6, 3])
+    return ResNet(args, [3, 4, 6, 3],)
+
+def ResNet50(args):
+    return ResNet(args, [3, 4, 6, 3],)
+
+def ResNet101(args):
+    return ResNet(args, [3, 4, 23, 3],)
+
+def ResNet152(args):
+    return ResNet(args, [3, 8, 36, 3],)
 
 def get_model(name):
     return  {'resnet18': ResNet18,
-             'resnet34': ResNet34}[name]
+             'resnet34': ResNet34,
+             'resnet50': ResNet50,
+             'resnet101': ResNet101,
+             'resnet152': ResNet152,}[name]
 
 '''# General ResNet class from https://github.com/kuangliu/pytorch-cifar/blob/master/models/resnet.py
 class RawResNet(nn.Module):
