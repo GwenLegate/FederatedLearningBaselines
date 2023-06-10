@@ -1,6 +1,10 @@
+#!/usr/bin/env python3
+import os, sys
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(os.path.dirname(SCRIPT_DIR))
 from src.options import args_parser
 from src.data_utils import get_dataset, dataset_config
-from src.utils import get_model, wandb_setup
+from src.utils import get_model
 from src.eval_utils import test_inference
 import torch
 from torch import nn
@@ -55,3 +59,7 @@ for i in range(len(test_nets)):
         test_acc, test_loss = test_inference(args, model, test_dataset, args.num_workers)
         print(f'train_acc: {train_acc}\ntrain_loss: {train_loss}\ntest_acc: {test_acc}\ntest_loss: {test_loss}')
         epoch += 1
+    print(f'FINAL ACC {test_nets[i]}:\n'
+          f'______________________________________________________________________________________________\n'
+          f'train_acc: {train_acc}\ntrain_loss: {train_loss}\ntest_acc: {test_acc}\ntest_loss: {test_loss}\n'
+          f'______________________________________________________________________________________________\n')

@@ -43,13 +43,13 @@ class Bottleneck(nn.Module):
     def __init__(self, in_planes, planes, stride, norm):
         super(Bottleneck, self).__init__()
         self.conv1 = nn.Conv2d(in_planes, planes, kernel_size=1, bias=False)
-        self.norm1 = self.norm2d(planes, norm)
+        self.norm1 = norm2d(planes, norm)
         self.conv2 = nn.Conv2d(planes, planes, kernel_size=3,
                                stride=stride, padding=1, bias=False)
-        self.norm2 = self.norm2d(planes, norm)
+        self.norm2 = norm2d(planes, norm)
         self.conv3 = nn.Conv2d(planes, self.expansion *
                                planes, kernel_size=1, bias=False)
-        self.norm3 = self.norm2d(planes, norm)
+        self.norm3 = norm2d(planes, norm)
 
         self.shortcut = nn.Sequential()
         if stride != 1 or in_planes != self.expansion*planes:
