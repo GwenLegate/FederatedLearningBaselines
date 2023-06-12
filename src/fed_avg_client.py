@@ -94,6 +94,7 @@ class FedAvgClient(object):
 
     def train_client(self, model, global_round):
         # Set mode to train model
+        model.to(self.args.device)
         model.train()
         epoch_loss = []
         # optional variable to return required params as needed
@@ -134,6 +135,7 @@ class FedAvgClient(object):
                         break
             epoch_loss.append(sum(batch_loss)/len(batch_loss))
 
+        model.to('cpu')
         return model.state_dict(), sum(epoch_loss) / len(epoch_loss), optional_eval_results
 
     def evaluate_client_model(self, idxs_clients, model):
@@ -158,6 +160,7 @@ class FedAvgClient(object):
         """
         Returns the inference accuracy and loss.
         """
+        model.to(self.args.device)
         model.eval()
         loss, total, correct = 0.0, 0.0, 0.0
         for batch_idx, (images, labels) in enumerate(self.testloader):
@@ -175,4 +178,5 @@ class FedAvgClient(object):
             total += len(labels)
 
         accuracy = correct / total
+        model.to('cpu')
         return accuracy, loss

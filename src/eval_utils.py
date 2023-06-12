@@ -19,6 +19,7 @@ def validation_inference(args, model, validation_dataset, num_workers):
     """
     Returns the validation accuracy and loss.
     """
+    model.to(args.device)
     model.eval()
     loss, total, correct = 0.0, 0.0, 0.0
     criterion = torch.nn.CrossEntropyLoss().to(args.device)
@@ -43,12 +44,14 @@ def validation_inference(args, model, validation_dataset, num_workers):
 
     accuracy = correct/total
     loss = loss / (batch_idx + 1)
+    model.to('cpu')
     return accuracy, loss
 
 def test_inference(args, model, test_dataset, num_workers):
     """
     Returns the test accuracy and loss.
     """
+    model.to(args.device)
     model.eval()
     loss, total, correct = 0.0, 0.0, 0.0
     criterion = torch.nn.CrossEntropyLoss().to(args.device)
@@ -71,6 +74,7 @@ def test_inference(args, model, test_dataset, num_workers):
 
     accuracy = correct/total
     loss = loss/batch_idx
+    model.to('cpu')
     return accuracy, loss
 
 def test_model(args, model_path):

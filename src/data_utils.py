@@ -84,7 +84,7 @@ def get_dataset(args):
             validation_dataset = datasets.MNIST(data_dir, train=True, download=False, transform=apply_transform)
             test_dataset = datasets.MNIST(data_dir, train=False, download=False, transform=apply_transform)
         else:
-            data_dir = './data/fmnist/'
+            data_dir = '../data/fmnist/'
             train_dataset = datasets.FashionMNIST(data_dir, train=True, download=False, transform=apply_transform)
             validation_dataset = datasets.FashionMNIST(data_dir, train=True, download=False, transform=apply_transform)
             test_dataset = datasets.FashionMNIST(data_dir, train=False, download=False, transform=apply_transform)

@@ -27,7 +27,7 @@ def args_parser():
     parser.add_argument('--momentum', type=float, default=0.97, help='SGD momentum, momentum parameter. default is 0.97 ')
     parser.add_argument('--model', type=str, default='resnet18',
                         help='model name, options: resnet18, resnet34')
-    parser.add_argument('--width', type=int, default=2, help='model width factor')
+    parser.add_argument('--width', type=int, default=1, help='model width factor')
     parser.add_argument('--kernel_num', type=int, default=9, help='number of each kind of kernel')
     parser.add_argument('--kernel_sizes', type=str, default='3,4,5',
                         help='comma-separated kernel size to use for convolution')

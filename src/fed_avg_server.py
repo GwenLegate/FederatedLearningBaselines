@@ -42,11 +42,6 @@ class FedAvgServer(object):
         if len(self.args.continue_train) > 0:
             global_model, user_groups = load_past_model(self.args, global_model)
 
-        # Set the model to training mode and send it to device.
-        global_model.to(self.args.device)
-        global_model.train()
-        print(global_model)
-
         # set up wandb connection
         if self.args.wandb:
             wandb_setup(self.args, global_model, run_dir)
@@ -63,7 +58,6 @@ class FedAvgServer(object):
             global_round = f'\n | Global Training Round : {epoch + 1} |\n'
             print(global_round)
 
-            global_model.train()
             m = max(int(self.args.frac * self.args.num_clients), 1)
             idxs_clients = np.random.choice(range(self.args.num_clients), m, replace=False)
 
@@ -128,10 +122,10 @@ class FedAvgServer(object):
         last_hundred_val_acc = sum(last_hundred_val_acc) / len(last_hundred_val_acc)
 
         if self.args.wandb:
-            wandb.log({f'val_acc': val_acc,
-                       f'test_acc': test_acc,
-                       f'last_100_val_acc': last_hundred_val_acc,
-                       f'last_100_test_acc': last_hundred_test_acc
+            wandb.log({'val_acc': val_acc,
+                       'test_acc': test_acc,
+                       'last_100_val_acc': last_hundred_val_acc,
+                       'last_100_test_acc': last_hundred_test_acc
                        })
 
         return val_acc, val_loss, test_acc, test_loss, last_hundred_val_acc, last_hundred_val_loss, \
