@@ -1,84 +1,104 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-# Python version: 3.6
+'''ResNet in PyTorch.
 
-from torch import nn
-from src.residualBlock import ResidualBlock, norm2d, Bottleneck
+For Pre-activation ResNet, see 'preact_resnet.py'.
 
-class ResNet(nn.Module):
-    def __init__(self, args, block_nums):
-        super(ResNet, self).__init__()
-        self.width = args.width
-        self.block_nums = block_nums
-        self.channels = [32, 64, 128, 256]
-        self.channels = [i * self.width for i in self.channels]
+Reference:
+[1] Kaiming He, Xiangyu Zhang, Shaoqing Ren, Jian Sun
+    Deep Residual Learning for Image Recognition. arXiv:1512.03385
+'''
+import torch.nn as nn
+import torch.nn.functional as F
 
-        self.conv1 = nn.Sequential(
-            nn.Conv2d(in_channels=args.num_channels, out_channels=self.channels[0], kernel_size=3, padding=1, stride=1),
-            norm2d(self.channels[0], args.norm),
-            nn.ReLU(inplace=True)
-        )
-        self.layer_1 = self.make_layer(ResidualBlock, self.channels[0], self.channels[0], stride=1, norm=args.norm, block_num=self.block_nums[0])
-        self.layer_2 = self.make_layer(ResidualBlock, self.channels[0], self.channels[1], stride=2, norm=args.norm, block_num=self.block_nums[1])
-        self.layer_3 = self.make_layer(ResidualBlock, self.channels[1], self.channels[2], stride=2, norm=args.norm, block_num=self.block_nums[2])
-        self.layer_4 = self.make_layer(ResidualBlock, self.channels[2], self.channels[3], stride=2, norm=args.norm, block_num=self.block_nums[3])
-        self.avgpool = nn.AvgPool2d((3, 3), stride=2)
-        self.fc = nn.Linear(self.channels[3] * 1 * 1, args.num_classes)
+def norm2d(outCh, norm):
+    if norm == 'group_norm':
+        return nn.GroupNorm(2, outCh, affine=True)
+    elif norm == 'batch_norm':
+        return nn.BatchNorm2d(outCh)
+    elif norm == 'instance_norm':
+        return nn.InstanceNorm2d(outCh, affine=True)
+
+class BasicBlock(nn.Module):
+    expansion = 1
+
+    def __init__(self, in_planes, planes, norm, stride=1):
+        super(BasicBlock, self).__init__()
+        self.conv1 = nn.Conv2d(
+            in_planes, planes, kernel_size=3, stride=stride, padding=1, bias=False)
+        self.n1 = norm2d(planes, norm)
+        self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, stride=1, padding=1, bias=False)
+        self.n2 = norm2d(planes, norm)
+
+        self.shortcut = nn.Sequential()
+        if stride != 1 or in_planes != self.expansion*planes:
+            self.shortcut = nn.Sequential(
+                nn.Conv2d(in_planes, self.expansion*planes, kernel_size=1, stride=stride, bias=False),
+                norm2d(self.expansion*planes, norm)
+            )
 
     def forward(self, x):
-        fc_width = 256 * self.width
-        x = self.conv1(x)
-        x = self.layer_1(x)
-        x = self.layer_2(x)
-        x = self.layer_3(x)
-        x = self.layer_4(x)
-        x = self.avgpool(x)
-        fc_input = x.view(-1, fc_width * 1 * 1)
-        x = self.fc(fc_input)
-        return x
-
-    def make_layer(self, block, inCh, outCh, stride, norm, block_num=2):
-        layers = []
-        layers.append(block(inCh, outCh, stride, norm))
-        for i in range(block_num - 1):
-            layers.append(block(outCh, outCh, 1, norm))
-        return nn.Sequential(*layers)
-
-def ResNet18(args):
-    return ResNet(args, [2, 2, 2, 2])
+        out = F.relu(self.n1(self.conv1(x)))
+        out = self.n2(self.conv2(out))
+        out += self.shortcut(x)
+        out = F.relu(out)
+        return out
 
 
-def ResNet34(args):
-    return ResNet(args, [3, 4, 6, 3])
+class Bottleneck(nn.Module):
+    expansion = 4
 
-def get_model(name):
-    return  {'resnet18': ResNet18,
-             'resnet34': ResNet34}[name]
+    def __init__(self, in_planes, planes, norm, stride=1):
+        super(Bottleneck, self).__init__()
+        self.conv1 = nn.Conv2d(in_planes, planes, kernel_size=1, bias=False)
+        self.n1 = norm2d(planes, norm)
+        self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, stride=stride, padding=1, bias=False)
+        self.n2 = norm2d(planes, norm)
+        self.conv3 = nn.Conv2d(planes, self.expansion * planes, kernel_size=1, bias=False)
+        self.n3 = norm2d(self.expansion*planes, norm)
 
-'''# General ResNet class from https://github.com/kuangliu/pytorch-cifar/blob/master/models/resnet.py
-class RawResNet(nn.Module):
-    def __init__(self, args, block, num_blocks):
-        super(RawResNet, self).__init__()
-        self.in_planes = 64
+        self.shortcut = nn.Sequential()
+        if stride != 1 or in_planes != self.expansion*planes:
+            self.shortcut = nn.Sequential(
+                nn.Conv2d(in_planes, self.expansion*planes, kernel_size=1, stride=stride, bias=False),
+                norm2d(self.expansion*planes, norm)
+            )
 
-        self.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=False)
-        self.norm1 = norm2d(64, args.norm),
-        self.layer1 = self._make_layer(block, 64, num_blocks[0], stride=1, norm=args.norm)
-        self.layer2 = self._make_layer(block, 128, num_blocks[1], stride=2, norm=args.norm)
-        self.layer3 = self._make_layer(block, 256, num_blocks[2], stride=2, norm=args.norm)
-        self.layer4 = self._make_layer(block, 512, num_blocks[3], stride=2, norm=args.norm)
-        self.linear = nn.Linear(512*block.expansion, args.num_classes)
+    def forward(self, x):
+        out = F.relu(self.n1(self.conv1(x)))
+        out = F.relu(self.n2(self.conv2(out)))
+        out = self.n3(self.conv3(out))
+        out += self.shortcut(x)
+        out = F.relu(out)
+        return out
+
+class ResNet(nn.Module):
+    def __init__(self, block, num_blocks, args):
+        super(ResNet, self).__init__()
+        self.num_classes = args.num_classes
+        self.width = args.width
+        self.norm = args.norm
+        self.num_blocks = num_blocks
+        self.channels = [64, 128, 256, 512]
+        self.channels = [i * self.width for i in self.channels]
+        self.in_planes = self.channels[0]
+
+        self.conv1 = nn.Conv2d(args.num_channels, self.channels[0], kernel_size=3, stride=1, padding=1, bias=False)
+        self.n1 = norm2d(self.channels[0], self.norm)
+        self.layer1 = self._make_layer(block, self.channels[0], num_blocks[0], stride=1, norm=self.norm)
+        self.layer2 = self._make_layer(block, self.channels[1], num_blocks[1], stride=2, norm=self.norm)
+        self.layer3 = self._make_layer(block, self.channels[2], num_blocks[2], stride=2, norm=self.norm)
+        self.layer4 = self._make_layer(block, self.channels[3], num_blocks[3], stride=2, norm=self.norm)
+        self.linear = nn.Linear(self.channels[3]*block.expansion, self.num_classes)
 
     def _make_layer(self, block, planes, num_blocks, stride, norm):
         strides = [stride] + [1]*(num_blocks-1)
         layers = []
         for stride in strides:
-            layers.append(block(self.in_planes, planes, stride, norm))
+            layers.append(block(self.in_planes, planes, norm, stride))
             self.in_planes = planes * block.expansion
         return nn.Sequential(*layers)
 
     def forward(self, x):
-        out = F.relu(self.norm1(self.conv1(x)))
+        out = F.relu(self.n1(self.conv1(x)))
         out = self.layer1(out)
         out = self.layer2(out)
         out = self.layer3(out)
@@ -86,15 +106,19 @@ class RawResNet(nn.Module):
         out = F.avg_pool2d(out, 4)
         out = out.view(out.size(0), -1)
         out = self.linear(out)
-        return out'''
+        return out
 
-'''def ResNet50():
-    return ResNet(Bottleneck, [3, 4, 6, 3])
+def ResNet18(args):
+    return ResNet(BasicBlock, [2, 2, 2, 2], args)
 
+def ResNet34(args):
+    return ResNet(BasicBlock, [3, 4, 6, 3], args)
 
-def ResNet101():
-    return ResNet(Bottleneck, [3, 4, 23, 3])
+def ResNet50(args):
+    return ResNet(Bottleneck, [3, 4, 6, 3], args)
 
+def ResNet101(args):
+    return ResNet(Bottleneck, [3, 4, 23, 3], args)
 
-def ResNet152():
-    return ResNet(Bottleneck, [3, 8, 36, 3])'''
+def ResNet152(args):
+    return ResNet(Bottleneck, [3, 8, 36, 3], args)
