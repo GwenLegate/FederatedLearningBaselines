@@ -36,9 +36,9 @@ if __name__ == "__main__":
 
     train_loss, train_accuracy = [], []
     epoch = 0
-    model.to(device)
     while epoch < args.epochs:
         print(f'Epoch {epoch}')
+        model.to(device)
         model.train()
         for batch_idx, (images, labels) in enumerate(trainloader):
             images, labels = images.to(device), labels.to(device)
