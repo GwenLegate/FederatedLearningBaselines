@@ -77,7 +77,7 @@ class ResNet(nn.Module):
         self.width = args.width
         self.norm = args.norm
         self.num_blocks = num_blocks
-        self.channels = [64, 128, 256, 512]
+        self.channels = [32, 64, 128, 256]
         self.channels = [i * self.width for i in self.channels]
         self.in_planes = self.channels[0]
 
