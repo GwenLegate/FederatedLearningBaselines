@@ -11,7 +11,6 @@ import torch
 from torch.utils.data import DataLoader
 import os
 import numpy as np
-#from src.models import ResNet34, ResNet18, ResNet50, ResNet101, ResNet152
 from src.models import ResNet34, ResNet18, ResNet50, ResNet101, ResNet152
 
 def average_weights(w):
