@@ -1,5 +1,6 @@
 import numpy as np
 from src.femnist_dataset import FEMNIST
+from src.imagenet32 import Imagenet32
 from torchvision import datasets, transforms
 from src.sampling import mnist_iid, mnist_noniid, cifar_iid, shard_noniid, equal_class_size_noniid_dirichlet, \
     femnist_iid, unequal_class_size_noniid_dirichlet
@@ -73,7 +74,7 @@ def get_dataset(args):
         validation_dataset = FEMNIST(data_dir, train=True, download=False, transform=test_transform)
         test_dataset = FEMNIST(data_dir, train=False, download=False, transform=test_transform)
 
-    elif args.dataset == 'mnist' or 'fmnist':
+    elif args.dataset == 'mnist' or args.dataset == 'fmnist':
         apply_transform = transforms.Compose([
             transforms.ToTensor(),
             transforms.Normalize((0.1307,), (0.3081,))])
@@ -88,6 +89,37 @@ def get_dataset(args):
             train_dataset = datasets.FashionMNIST(data_dir, train=True, download=False, transform=apply_transform)
             validation_dataset = datasets.FashionMNIST(data_dir, train=True, download=False, transform=apply_transform)
             test_dataset = datasets.FashionMNIST(data_dir, train=False, download=False, transform=apply_transform)
+    elif args.dataset == 'imagenet32':
+        data_dir = '../data/imagenet32/'
+        normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                         std=[0.229, 0.224, 0.225])
+
+        train_dataset = Imagenet32(
+            f'{data_dir}out_data_train/',
+            transform=transforms.Compose([
+                transforms.RandomCrop(32, padding=4),
+                transforms.RandomHorizontalFlip(),
+                transforms.ToTensor(),
+                normalize,
+            ]))
+
+        validation_dataset = Imagenet32(
+            f'{data_dir}out_data_train/',
+            transform=transforms.Compose([
+                transforms.RandomCrop(32, padding=4),
+                transforms.RandomHorizontalFlip(),
+                transforms.ToTensor(),
+                normalize,
+            ]))
+
+        test_dataset = Imagenet32(
+            f'{data_dir}out_data_val/',
+            transform=transforms.Compose([
+                transforms.RandomCrop(32, padding=4),
+                transforms.RandomHorizontalFlip(),
+                transforms.ToTensor(),
+                normalize,
+            ]))
 
     return train_dataset, validation_dataset, test_dataset
 
@@ -117,7 +149,7 @@ def split_dataset(train_dataset, args):
                 # non iid data distributions for clients created by dirichlet distributionvia shard method in Mcmahan(2016)
                 print(f'Creating non iid client datasets using shards')
                 user_groups = shard_noniid(train_dataset, args.num_clients)
-    elif args.dataset == 'femnist':
+    elif args.dataset in ['femnist', 'imagenet32']:
         if args.dirichlet:
             user_groups = unequal_class_size_noniid_dirichlet(train_dataset, args.alpha, args.num_clients, args.num_classes)
         else:
@@ -129,4 +161,5 @@ def split_dataset(train_dataset, args):
             user_groups = mnist_iid(train_dataset, args.num_clients)
         else:
             user_groups = mnist_noniid(train_dataset, args.num_clients)
+
     return user_groups
