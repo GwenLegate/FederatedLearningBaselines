@@ -23,9 +23,12 @@ if __name__ == "__main__":
     wandb_setup(args, model, run_dir)
 
     if args.optimizer == 'sgd':
-        optimizer = torch.optim.SGD(model.parameters(), lr=args.client_lr, weight_decay=1e-4)
+        optimizer = torch.optim.SGD(model.parameters(), lr=args.client_lr, momentum=0.9, weight_decay=1e-4)
     elif args.optimizer == 'adam':
         optimizer = torch.optim.Adam(model.parameters(), lr=args.client_lr, weight_decay=1e-4)
+
+    # LR decay
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=64, eta_min=1e-5)
 
     train_dataset, _, test_dataset = get_dataset(args)
     train_dataset, test_dataset = train_dataset, test_dataset
@@ -48,6 +51,7 @@ if __name__ == "__main__":
             loss = criterion(logits, labels)
             loss.backward()
             optimizer.step()
+            scheduler.step()
 
         model.eval()
         train_acc, train_loss = test_inference(args, model, train_dataset, args.num_workers)
