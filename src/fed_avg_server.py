@@ -42,6 +42,11 @@ class FedAvgServer(object):
         if len(self.args.continue_train) > 0:
             global_model, user_groups = load_past_model(self.args, global_model)
 
+        # set best acc to update saved global model
+        val_acc, _ = validation_inference(self.args, global_model, validation_dataset_global,
+                                              self.args.num_workers)
+        best_acc = copy.deepcopy(val_acc)
+
         # set up wandb connection
         if self.args.wandb:
             wandb_setup(self.args, global_model, run_dir)
@@ -88,6 +93,12 @@ class FedAvgServer(object):
             print(f'Epoch {epoch} Validation Accuracy {val_acc * 100}% \nValidation Loss {val_loss} '
                   f'\nTraining Loss (average loss of clients evaluated on their own in distribution validation set): {loss_avg}')
 
+            if val_acc > best_acc:
+                # save model if it is best acc
+                best_acc = copy.deepcopy(val_acc)
+                model_path = f'{run_dir}/global_model.pt'
+                torch.save(global_model.state_dict(), model_path)
+
             if self.args.epochs - (epoch + 1) <= 100:
                 last_hundred_val_loss.append(val_loss)
                 last_hundred_val_acc.append(val_acc)
@@ -110,7 +121,8 @@ class FedAvgServer(object):
         # save final model after training
         # model_path = f'/scratch/{os.environ.get("USER", "glegate")}/{self.args.wandb_run_name}/global_model.pt'
         model_path = f'{run_dir}/global_model.pt'
-        torch.save(global_model.state_dict(), model_path)
+        # load best model for testing
+        global_model.load_state_dict(torch.load(model_path))
 
         # Test inference after completion of training
         test_acc, test_loss = test_inference(self.args, global_model, test_dataset, self.args.num_workers)

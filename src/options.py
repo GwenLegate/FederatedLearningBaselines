@@ -24,10 +24,12 @@ def args_parser():
     parser.add_argument('--global_lr', type=float, default=1,
                         help='learning rate for global model, always 1 for FedAvg version')
     parser.add_argument('--client_lr', type=float, default=0.1, help='learning rate for client models')
-    parser.add_argument('--momentum', type=float, default=0.97, help='SGD momentum, momentum parameter. default is 0.97 ')
+    parser.add_argument('--momentum', type=float, default=0.9, help='SGD momentum, momentum parameter. default is 0.9 ')
     parser.add_argument('--model', type=str, default='resnet18',
-                        help='model name, options: resnet18, resnet34')
+                        help='model name, options: ResNet18, ResNet34, ResNet50, ResNet101, ResNet152')
     parser.add_argument('--width', type=int, default=2, help='model width factor')
+    parser.add_argument('--accu_split', type=int, default=None,
+                        help='number of groups to split batch into for gradient accumulation when using very large medels')
     parser.add_argument('--kernel_num', type=int, default=9, help='number of each kind of kernel')
     parser.add_argument('--kernel_sizes', type=str, default='3,4,5',
                         help='comma-separated kernel size to use for convolution')
