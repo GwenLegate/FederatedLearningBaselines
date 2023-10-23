@@ -123,12 +123,25 @@ class FedAvgClient(object):
 
                 logits = model(images)
                 loss = self.criterion(logits, labels)
-                loss.backward()
-                optimizer.step()
-                if self.args.decay == 1:
-                    scheduler.step()
 
-                batch_loss.append(loss.item())
+                if self.args.accu_split is not None:
+                    if batch_idx % self.args.accu_split == 0:
+                        local_iter_count += 1
+                        loss.backward()
+                        optimizer.step()
+                        if self.args.decay == 1:
+                            scheduler.step()
+                        model.zero_grad()
+                        batch_loss.append(loss.item())
+                else:
+                    local_iter_count += 1
+                    loss.backward()
+                    optimizer.step()
+                    if self.args.decay == 1:
+                        scheduler.step()
+                    model.zero_grad()
+
+                    batch_loss.append(loss.item())
 
                 if self.args.local_iters is not None:
                     if self.args.local_iters == local_iter_count:
