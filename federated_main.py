@@ -6,10 +6,13 @@ from src.options import args_parser, validate_args
 from src.utils import set_random_args
 from src.data_utils import dataset_config
 from src.fed_avg_server import FedAvgServer
+from src.fedavgm_server import FedAvgMServer
 
 def run_fed(args, fed_type):
     if fed_type == 'fed_avg':
         server = FedAvgServer(args)
+    elif fed_type == 'fedavgm':
+        server = FedAvgMServer(args)
     else:
         raise ValueError(f'type {fed_type} not implemented')
     return server.start_server()

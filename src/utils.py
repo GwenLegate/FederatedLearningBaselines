@@ -197,11 +197,14 @@ def get_model(args):
     else:
         exit('Error: unrecognized model')
 
-def load_past_model(args, model):
-    # if this run is a continuation of training for a failed run, load previous model and client distributions
+def load_past_model(args, model, momentum=None):
+    # if this run is a continuation of training for a failed run, load previous model and client distributions (and momentum for fedavgm)
     model.load_state_dict(torch.load(args.continue_train))
     user_groups_path = f"{args.continue_train.rsplit('/', 1)[0]}/user_groups.pt"
     user_groups = torch.load(user_groups_path)
+    if momentum is not None:
+        momentum = f"{args.continue_train.rsplit('/', 1)[0]}/server_momentum.pt"
+        return model, user_groups, momentum
     return model, user_groups
 
 def get_delta(params1, params2):
