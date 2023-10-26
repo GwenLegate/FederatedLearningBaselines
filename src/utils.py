@@ -12,7 +12,7 @@ from torch.utils.data import DataLoader
 import os
 import numpy as np
 from src.models import ResNet34, ResNet18, ResNet50, ResNet101, ResNet152
-from client_utils import DatasetSplit
+from src.client_utils import DatasetSplit
 import torch.nn.functional as F
 
 
