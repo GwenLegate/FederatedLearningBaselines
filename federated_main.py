@@ -30,7 +30,7 @@ if __name__ == '__main__':
 
         validate_args(args)
         val_acc, val_loss, test_acc, test_loss, last_hundred_val_acc, last_hundred_val_loss, last_hundred_test_acc, \
-        last_hundred_test_loss = run_fed(args, 'fed_avg')
+        last_hundred_test_loss = run_fed(args, args.fed_type)
 
         print(f' \n Results after {args.epochs} global rounds of training:')
         print("|---- Validation Accuracy: {:.2f}%".format(100 * val_acc))
