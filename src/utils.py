@@ -12,6 +12,9 @@ from torch.utils.data import DataLoader
 import os
 import numpy as np
 from src.models import ResNet34, ResNet18, ResNet50, ResNet101, ResNet152
+from client_utils import DatasetSplit
+import torch.nn.functional as F
+
 
 def average_weights(w):
     """
@@ -23,6 +26,7 @@ def average_weights(w):
             w_avg[key] += w[i][key]
         w_avg[key] = torch.div(w_avg[key], len(w))
     return w_avg
+
 
 def average_grads(local_grads):
     grad_avg = copy.deepcopy(local_grads[0])
@@ -36,6 +40,7 @@ def average_grads(local_grads):
             grad_avg[k] *= int(1 / len(local_grads))
 
     return grad_avg
+
 
 def update_with_momentum(args, momentum, w_delta, global_weights):
     # option for sgd with weight decay and nesterov accelerate gradient as outlined in FedAvgM paper by Hsu et al.
@@ -58,8 +63,9 @@ def update_with_momentum(args, momentum, w_delta, global_weights):
     for k, v in global_weights.items():
         new_momentum[k] = (args.momentum * momentum[k]) + w_delta[k]
         global_weights[k] = global_weights[k] - args.global_lr * new_momentum[k]
-        #global_weights[k] = global_weights[k] - (args.momentum * momentum[k]) - w_delta[k] #equivalent
+        # global_weights[k] = global_weights[k] - (args.momentum * momentum[k]) - w_delta[k] #equivalent
     return new_momentum, global_weights
+
 
 def update_momentum(args, momentum, prev_global_weights, global_weights):
     # option for sgd with weight decay and nesterov accelerate gradient as outlined in FedAvgM paper by Hsu et al.
@@ -87,13 +93,14 @@ def update_momentum(args, momentum, prev_global_weights, global_weights):
     for k, v in global_weights.items():
         momentum_update[k] = (args.momentum * momentum[k]) + global_w_delta[k]
 
-    # add momentum to global update. current global weights are (w - delta_w)
-    # momentum update is (w - beta*momentum - delta_w) --> (global_weight -beta*new_momentum)
+        # add momentum to global update. current global weights are (w - delta_w)
+        # momentum update is (w - beta*momentum - delta_w) --> (global_weight -beta*new_momentum)
         global_weights[k] = global_weights[k] - args.global_lr * momentum_update[k]
 
     return momentum_update, global_weights
 
-   # set random values for learning rates, local epochs, local batch size for hyperparameter search
+
+# set random values for learning rates, local epochs, local batch size for hyperparameter search
 def set_random_args(args):
     lrs = [7E-2, 5E-2, 3E-2, 1E-2, 7E-3, 5E-3, 3E-3, 1E-3, 7E-4]
     args.local_bs = random.randrange(5, 120, 5)  # sets a local batch size between 5 and 125 (intervals of 5)
@@ -106,16 +113,18 @@ def set_random_args(args):
     else:
         args.epochs = random.randrange(2500, 4501, 250)
 
+
 # method to empirically find a good number of workers for data loaders
 def find_optimal_num_workers(training_data, bs):
     for num_workers in range(2, mp.cpu_count()):
-        train_loader = DataLoader(training_data,shuffle=True,num_workers=num_workers,batch_size=bs,pin_memory=True)
+        train_loader = DataLoader(training_data, shuffle=True, num_workers=num_workers, batch_size=bs, pin_memory=True)
         start = time()
         for epoch in range(1, 3):
             for _, _ in enumerate(train_loader, 0):
                 pass
         end = time()
         print("Finish with:{} second, num_workers={}".format(end - start, num_workers))
+
 
 def run_summary(args):
     print(f'Run Parameters:\n'
@@ -131,6 +140,7 @@ def run_summary(args):
           f'\tnorm: {args.norm}\n'
           f'\tdataset: {args.dataset}')
 
+
 def wandb_setup(args, model, run_dir, central=False):
     if args.wandb_run_name:
         os.environ['WANDB_NAME'] = args.wandb_run_name
@@ -143,7 +153,7 @@ def wandb_setup(args, model, run_dir, central=False):
     # wandb_path = f'/scratch/{os.environ.get("USER","glegate")}/wandb'
     wandb_path = f'{run_dir}/wandb'
     if not os.path.isdir(wandb_path):
-        os.makedirs(wandb_path, mode=0o755, exist_ok=True,)
+        os.makedirs(wandb_path, mode=0o755, exist_ok=True, )
 
     # if using wandb check project and entity are set
     assert not args.wandb_project == '' and not args.wandb_entity == ''
@@ -182,6 +192,7 @@ def wandb_setup(args, model, run_dir, central=False):
 
     wandb.watch(model, log_freq=args.print_every)
 
+
 def get_model(args):
     # BUILD MODEL
     if args.model == 'resnet18':
@@ -197,12 +208,14 @@ def get_model(args):
     else:
         exit('Error: unrecognized model')
 
+
 def load_past_model(args, model):
     # if this run is a continuation of training for a failed run, load previous model and client distributions
     model.load_state_dict(torch.load(args.continue_train))
     user_groups_path = f"{args.continue_train.rsplit('/', 1)[0]}/user_groups.pt"
     user_groups = torch.load(user_groups_path)
     return model, user_groups
+
 
 def get_delta(params1, params2):
     '''
@@ -219,8 +232,10 @@ def get_delta(params1, params2):
         params2[k] -= params1[k]
     return params2
 
+
 def zero_last_hundred():
     return [], [], [], []
+
 
 def compute_accuracy(model, dataloader, device):
     """
@@ -242,7 +257,7 @@ def compute_accuracy(model, dataloader, device):
     with torch.no_grad():
         for tmp in dataloader:
             for batch_idx, (x, target) in enumerate(tmp):
-                x, target = x.to(device), target.to(device,dtype=torch.int64)
+                x, target = x.to(device), target.to(device, dtype=torch.int64)
                 out = model(x)
                 _, pred_label = torch.max(out.data, 1)
 
@@ -259,4 +274,32 @@ def compute_accuracy(model, dataloader, device):
     if was_training:
         model.train()
 
-    return correct/float(total)
+    return correct / float(total)
+
+
+def ncm(args, model, train_dataset, user_groups):
+    class_sums = torch.zeros((args.num_classes, 512)).to(args.device)
+    class_count = torch.zeros(args.num_classes).to(args.device)
+
+    # combine indices for training sets of each client
+    for i in range(args.num_clients):
+        if i == 0:
+            train_idxs = user_groups[i]['train']
+        else:
+            train_idxs = np.concatenate((train_idxs, user_groups[i]['train']), axis=0)
+
+    trainloader = DataLoader(DatasetSplit(train_dataset, train_idxs),
+                             batch_size=512, shuffle=True, num_workers=args.num_workers, pin_memory=True)
+
+    for batch_idx, (data, target) in enumerate(trainloader):
+        data, target = data.to(args.device), target.to(args.device)
+        features = torch.nn.Sequential(*list(model.children())[:-1])(data)
+        features = F.adaptive_avg_pool2d(features, 1).squeeze()
+
+        for i, t in enumerate(target):
+            class_sums[t] += features[i].data.squeeze()
+            class_count[t] += 1
+    class_means = torch.div(class_sums, torch.reshape(class_count, (-1, 1)))
+    model.fc.weight.data = torch.nn.functional.normalize(class_means)
+
+    return model
