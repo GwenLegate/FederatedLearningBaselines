@@ -9,7 +9,7 @@ from src.fed_avg_server import FedAvgServer
 from src.fedavgm_server import FedAvgMServer
 
 def run_fed(args, fed_type):
-    if fed_type == 'fed_avg':
+    if fed_type == 'fedavg':
         server = FedAvgServer(args)
     elif fed_type == 'fedavgm':
         server = FedAvgMServer(args)
