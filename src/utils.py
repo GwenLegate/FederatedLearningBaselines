@@ -280,6 +280,7 @@ def compute_accuracy(model, dataloader, device):
 def ncm(args, model, train_dataset, user_groups):
     class_sums = torch.zeros((args.num_classes, 512)).to(args.device)
     class_count = torch.zeros(args.num_classes).to(args.device)
+    model.to(args.device)
 
     # combine indices for training sets of each client
     for i in range(args.num_clients):
@@ -302,4 +303,4 @@ def ncm(args, model, train_dataset, user_groups):
     class_means = torch.div(class_sums, torch.reshape(class_count, (-1, 1)))
     model.fc.weight.data = torch.nn.functional.normalize(class_means)
 
-    return model
+    return model.to('cpu')
