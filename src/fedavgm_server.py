@@ -87,7 +87,8 @@ class FedAvgMServer(object):
 
             # update global weights using the average of the obtained local deltas
             global_delta = average_weights(local_deltas)
-            server_momentum, global_weights = self._update_with_momentum(copy.deepcopy(server_momentum), copy.deepcopy(global_weights), copy.deepcopy(global_delta))
+            server_momentum, global_weights = self._update_with_momentum(copy.deepcopy(server_momentum), copy.deepcopy(global_weights),
+                                                                         copy.deepcopy(global_delta))
             global_model.load_state_dict(global_weights)
 
             # Test global model inference on validation set after each round use model save criteria
@@ -146,11 +147,11 @@ class FedAvgMServer(object):
         return val_acc, val_loss, test_acc, test_loss, last_hundred_val_acc, last_hundred_val_loss, \
                last_hundred_test_acc, last_hundred_test_loss
 
-    def _update_with_momentum(self, args, momentum, global_weights, global_deltas):
+    def _update_with_momentum(self, momentum, global_weights, global_deltas):
         # updates using deltas instead of weights
         momentum_update = copy.deepcopy(momentum)
 
         for k, v in global_weights.items():
-            momentum_update[k] = (args.momentum * momentum[k]) + global_deltas[k]
-            global_weights[k] -= args.global_lr * momentum_update[k]
+            momentum_update[k] = (self.args.momentum * momentum[k]) + global_deltas[k]
+            global_weights[k] -= self.args.global_lr * momentum_update[k]
         return momentum_update, global_weights
