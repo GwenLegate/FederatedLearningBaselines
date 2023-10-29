@@ -8,7 +8,7 @@ from src.data_utils import dataset_config
 from src.fed_avg_server import FedAvgServer
 
 def run_fed(args, fed_type):
-    if fed_type == 'fed_avg':
+    if fed_type == 'fedavg':
         server = FedAvgServer(args)
     else:
         raise ValueError(f'type {fed_type} not implemented')

@@ -301,6 +301,5 @@ def ncm(args, model, train_dataset, user_groups):
             class_sums[t] += features[i].data.squeeze()
             class_count[t] += 1
     class_means = torch.div(class_sums, torch.reshape(class_count, (-1, 1)))
-    model.fc.weight.data = torch.nn.functional.normalize(class_means)
-
+    model.linear.weight.data = torch.nn.functional.normalize(class_means)
     return model.to('cpu')
