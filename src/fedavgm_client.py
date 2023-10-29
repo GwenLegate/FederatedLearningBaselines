@@ -93,8 +93,9 @@ class FedAvgMClient(object):
             return grad_dict
 
     def train_client(self, model, global_round):
+        initial_weights = copy.deepcopy(model.to('cpu')).state_dict()
         # Set mode to train model
-        model.to(self.args.device)
+        model.to(self.device)
         model.train()
         epoch_loss = []
         # optional variable to return required params as needed
@@ -109,8 +110,6 @@ class FedAvgMClient(object):
         # learning rate decay
         if self.args.decay == 1:
             scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=500, gamma=0.1)
-
-        initial_weights = copy.deepcopy(model.to('cpu')).state_dict()
 
         # counts number of rounds of sgd
         local_iter_count = 0

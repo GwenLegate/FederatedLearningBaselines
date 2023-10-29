@@ -94,7 +94,7 @@ class FedAvgClient(object):
 
     def train_client(self, model, global_round):
         # Set mode to train model
-        model.to(self.args.device)
+        model.to(self.device)
         model.train()
         epoch_loss = []
         # optional variable to return required params as needed
