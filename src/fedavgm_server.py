@@ -6,13 +6,13 @@ import copy
 import numpy as np
 import wandb
 import torch
-from src.fed_avg_client import FedAvgClient
-from src.utils import average_weights, get_model, load_past_model, run_summary, wandb_setup, zero_last_hundred, ncm
+from src.fedavgm_client import FedAvgMClient
+from src.utils import average_weights, get_model, load_past_model, run_summary, wandb_setup, zero_last_hundred
 from src.eval_utils import validation_inference, test_inference, get_validation_ds
 from src.client_utils import get_client_labels
 from src.data_utils import get_dataset, split_dataset
 
-class FedAvgServer(object):
+class FedAvgMServer(object):
     def __init__(self, args):
         self.args = args
 
@@ -38,12 +38,16 @@ class FedAvgServer(object):
         validation_dataset_global = get_validation_ds(self.args.num_clients, user_groups, validation_dataset)
         # init server model
         global_model = get_model(self.args)
+        global_weights = global_model.state_dict()
+
+        # initialize momentum dict
+        server_momentum = copy.deepcopy(global_weights)
+        for k, v in server_momentum.items():
+            server_momentum[k] = torch.zeros_like(v)
+
         # if this run is a continuation of training for a failed run, load previous model and client distributions
         if len(self.args.continue_train) > 0:
-            global_model, user_groups = load_past_model(self.args, global_model)
-        # ncm init if using ncm
-        if self.args.ncm:
-            global_model = ncm(self.args, global_model, train_dataset, user_groups)
+            global_model, user_groups, momentum = load_past_model(self.args, global_model, server_momentum)
 
         # set best acc to update saved global model
         val_acc, _ = validation_inference(self.args, global_model, validation_dataset_global,
@@ -61,7 +65,7 @@ class FedAvgServer(object):
         # **** TRAINING LOOPS STARTS HERE ****
         while epoch < self.args.epochs:
             local_losses = []
-            local_weights = []
+            local_deltas = []
 
             global_round = f'\n | Global Training Round : {epoch + 1} |\n'
             print(global_round)
@@ -71,18 +75,20 @@ class FedAvgServer(object):
 
             # for each selected client, init model weights with global weights and train lcl model for local_ep epochs
             for idx in idxs_clients:
-                local_model = FedAvgClient(args=self.args, train_dataset=train_dataset, validation_dataset=validation_dataset,
+                local_model = FedAvgMClient(args=self.args, train_dataset=train_dataset, validation_dataset=validation_dataset,
                                           idx=idx, client_labels=client_labels[idx], all_client_data=user_groups)
 
-                w, loss, results = local_model.train_client(model=copy.deepcopy(global_model), global_round=epoch)
-                local_weights.append(copy.deepcopy(w))
+                delta, loss, results = local_model.train_client(model=copy.deepcopy(global_model), global_round=epoch)
+                local_deltas.append(copy.deepcopy(delta))
                 local_losses.append(copy.deepcopy(loss))
 
             loss_avg = sum(local_losses) / len(local_losses)
             train_loss.append(loss_avg)
 
-            # update global weights with the average of the obtained local weights
-            global_weights = average_weights(local_weights)
+            # update global weights using the average of the obtained local deltas
+            global_delta = average_weights(local_deltas)
+            server_momentum, global_weights = self._update_with_momentum(copy.deepcopy(server_momentum), copy.deepcopy(global_weights),
+                                                                         copy.deepcopy(global_delta))
             global_model.load_state_dict(global_weights)
 
             # Test global model inference on validation set after each round use model save criteria
@@ -90,18 +96,13 @@ class FedAvgServer(object):
             print(f'Epoch {epoch} Validation Accuracy {val_acc * 100}% \nValidation Loss {val_loss} '
                   f'\nTraining Loss (average loss of clients evaluated on their own in distribution validation set): {loss_avg}')
 
-            # Test with NCM reset
-            if self.args.ncm:
-                global_model = ncm(self.args, global_model, train_dataset, user_groups)
-                val_acc_ncm, val_loss_ncm = validation_inference(self.args, global_model, validation_dataset_global,
-                                                         self.args.num_workers)
-                print(f'\tNCM Validation Accuracy {val_acc * 100}% \nNCM Validation Loss {val_loss} ')
-
             if val_acc > best_acc:
-                # save model if it is best acc
+                # save model, momentum update if it is best acc
                 best_acc = copy.deepcopy(val_acc)
                 model_path = f'{run_dir}/global_model.pt'
+                momentum_path = f'{run_dir}/server_momentum.pt'
                 torch.save(global_model.state_dict(), model_path)
+                torch.save(server_momentum, momentum_path)
 
             if self.args.epochs - (epoch + 1) <= 100:
                 last_hundred_val_loss.append(val_loss)
@@ -126,8 +127,6 @@ class FedAvgServer(object):
         model_path = f'{run_dir}/global_model.pt'
         # load best model for testing
         global_model.load_state_dict(torch.load(model_path))
-        if self.args.ncm:
-            global_model = ncm(self.args, global_model, train_dataset, user_groups)
 
         # Test inference after completion of training
         test_acc, test_loss = test_inference(self.args, global_model, test_dataset, self.args.num_workers)
@@ -148,8 +147,15 @@ class FedAvgServer(object):
         return val_acc, val_loss, test_acc, test_loss, last_hundred_val_acc, last_hundred_val_loss, \
                last_hundred_test_acc, last_hundred_test_loss
 
+    def _update_with_momentum(self, momentum, global_weights, global_deltas):
+        # updates using deltas instead of weights
+        momentum_update = copy.deepcopy(momentum)
 
-
-
-
-
+        for k, v in global_weights.items():
+            if "running" in k or "batches_tracked" in k:
+                pass
+            else:
+                momentum_update[k] = (self.args.momentum * momentum[k]) + global_deltas[k]
+                a = self.args.global_lr * momentum_update[k]
+                global_weights[k] -= self.args.global_lr * momentum_update[k]
+        return momentum_update, global_weights
