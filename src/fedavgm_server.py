@@ -152,6 +152,10 @@ class FedAvgMServer(object):
         momentum_update = copy.deepcopy(momentum)
 
         for k, v in global_weights.items():
-            momentum_update[k] = (self.args.momentum * momentum[k]) + global_deltas[k]
-            global_weights[k] -= self.args.global_lr * momentum_update[k]
+            if "running" in k or "batches_tracked" in k:
+                pass
+            else:
+                momentum_update[k] = (self.args.momentum * momentum[k]) + global_deltas[k]
+                a = self.args.global_lr * momentum_update[k]
+                global_weights[k] -= self.args.global_lr * momentum_update[k]
         return momentum_update, global_weights
