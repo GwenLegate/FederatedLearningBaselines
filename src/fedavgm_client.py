@@ -8,7 +8,7 @@ from torch import nn
 from torch.utils.data import DataLoader
 from src.client_utils import DatasetSplit, train_test
 
-class FedAvgClient(object):
+class FedAvgMClient(object):
     def __init__(self, args, train_dataset, validation_dataset, idx, client_labels, all_client_data):
         self.args = args
         self.client_idx = idx
@@ -93,6 +93,7 @@ class FedAvgClient(object):
             return grad_dict
 
     def train_client(self, model, global_round):
+        initial_weights = copy.deepcopy(model.to('cpu')).state_dict()
         # Set mode to train model
         model.to(self.device)
         model.train()
@@ -140,7 +141,6 @@ class FedAvgClient(object):
                     if self.args.decay == 1:
                         scheduler.step()
                     model.zero_grad()
-
                     batch_loss.append(loss.item())
 
                 if self.args.local_iters is not None:
@@ -149,7 +149,8 @@ class FedAvgClient(object):
             epoch_loss.append(sum(batch_loss)/len(batch_loss))
 
         model.to('cpu')
-        return model.state_dict(), sum(epoch_loss) / len(epoch_loss), optional_eval_results
+        delta = self._get_delta(copy.deepcopy(model).state_dict(), initial_weights)
+        return delta, sum(epoch_loss) / len(epoch_loss), optional_eval_results
 
     def evaluate_client_model(self, idxs_clients, model):
         """ evaluates an individual client model on the datasets of all other clients selected for this round
@@ -193,3 +194,20 @@ class FedAvgClient(object):
         accuracy = correct / total
         model.to('cpu')
         return accuracy, loss
+
+    def _get_delta(self, params1, params2):
+        '''
+        Computes delta of model weights or gradients (params2-params1)
+        grad update w+ = w - delta_w --> delta_w = w - w+
+        Args:
+            params1: state dict of weights or gradients
+            params2: state dict of weights or gradients
+        Returns:
+            state dict of the delta between params1 and params2
+        '''
+        params1 = copy.deepcopy(params1)
+        params2 = copy.deepcopy(params2)
+        for k, _ in params1.items():
+            params2[k] = params2[k].float()
+            params2[k] -= params1[k].float()
+        return params2
