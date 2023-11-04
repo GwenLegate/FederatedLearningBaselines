@@ -7,6 +7,7 @@ import numpy as np
 from torch import nn
 from torch.utils.data import DataLoader
 from src.client_utils import DatasetSplit, train_test
+from src.utils import ncm
 
 class FedAvgClient(object):
     def __init__(self, args, train_dataset, validation_dataset, idx, client_labels, all_client_data):
@@ -95,6 +96,9 @@ class FedAvgClient(object):
     def train_client(self, model, global_round):
         # Set mode to train model
         model.to(self.device)
+        if self.args.freeze_ll == 1 and self.args.ncm == 1:
+            model.linear.weight.requires_grad = False
+            model.linear.bias.requires_grad = False
         model.train()
         epoch_loss = []
         # optional variable to return required params as needed
@@ -148,6 +152,8 @@ class FedAvgClient(object):
                         break
             epoch_loss.append(sum(batch_loss)/len(batch_loss))
 
+        if self.args.ncm:
+            model = ncm(self.args, model, self.train_dataset, self.all_client_data, self.client_idx)
         model.to('cpu')
         return model.state_dict(), sum(epoch_loss) / len(epoch_loss), optional_eval_results
 

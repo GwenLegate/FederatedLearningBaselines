@@ -91,11 +91,11 @@ class FedAvgServer(object):
                   f'\nTraining Loss (average loss of clients evaluated on their own in distribution validation set): {loss_avg}')
 
             # Test with NCM reset
-            if self.args.ncm:
+            '''if self.args.ncm:
                 global_model = ncm(self.args, global_model, train_dataset, user_groups)
-                val_acc_ncm, val_loss_ncm = validation_inference(self.args, global_model, validation_dataset_global,
+                val_acc, val_loss = validation_inference(self.args, global_model, validation_dataset_global,
                                                          self.args.num_workers)
-                print(f'\tNCM Validation Accuracy {val_acc * 100}% \nNCM Validation Loss {val_loss} ')
+                print(f'\tNCM Validation Accuracy {val_acc * 100}% \nNCM Validation Loss {val_loss} ')'''
 
             if val_acc > best_acc:
                 # save model if it is best acc
@@ -126,8 +126,8 @@ class FedAvgServer(object):
         model_path = f'{run_dir}/global_model.pt'
         # load best model for testing
         global_model.load_state_dict(torch.load(model_path))
-        if self.args.ncm:
-            global_model = ncm(self.args, global_model, train_dataset, user_groups)
+        '''if self.args.ncm:
+            global_model = ncm(self.args, global_model, train_dataset, user_groups)'''
 
         # Test inference after completion of training
         test_acc, test_loss = test_inference(self.args, global_model, test_dataset, self.args.num_workers)

@@ -14,7 +14,6 @@ def args_parser():
                         help="set run name to differentiate runs, if you don't set this wandb will auto generate one")
     parser.add_argument("--offline", type=bool, default=False, help="set wandb to run in offline mode")
     parser.add_argument('--num_workers', type=int, default=1, help="how many subprocesses to use for data loading.")
-    parser.add_argument("--fed_type", type=str, default='fedavg', help="chose federated algorithm. fedavg, fedavgm implemented (so far)")
     parser.add_argument('--epochs', type=int, default=4000, help="number of rounds of training")
     parser.add_argument("--fed_type", type=str, default='fedavg', help="chose federated algorithm. fedavg, fedavgm implemented (so far)")
     parser.add_argument('--num_clients', type=int, default=100, help="number of clients: K")
