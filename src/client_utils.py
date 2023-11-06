@@ -51,7 +51,7 @@ def get_client_labels(dataset, user_groups, num_workers, num_classes, proportion
     if proportions:
         client_groups = user_groups.items()
         if subset_idxs is not None:
-            client_groups = [client_groups[i] for i in range(len(client_groups)) if i in subset_idxs]
+            client_groups = [client for client in client_groups if client[0] in subset_idxs]
         client_labels = []
         client_proportions = []
         for client in client_groups:
