@@ -40,63 +40,6 @@ def average_grads(local_grads):
 
     return grad_avg
 
-def update_with_momentum(args, momentum, w_delta, global_weights):
-    # option for sgd with weight decay and nesterov accelerate gradient as outlined in FedAvgM paper by Hsu et al.
-    # TODO: fix, not working
-    '''optimizer = torch.optim.SGD(global_model.parameters(), lr=args.global_lr, weight_decay=0.004, momentum=args.momentum, nesterov=True)
-    #optimizer = torch.optim.SGD(global_model.parameters(), args.momentum)
-    global_model.zero_grad()
-    # manually set grads
-    grad_idx = 0
-    with torch.no_grad():
-        for param in global_model.parameters():
-            param.grad = grad_avg[tensor_keys[grad_idx]]
-            grad_idx += 1
-    optimizer.step()'''
-
-    momentum = copy.deepcopy(momentum)
-    w_delta = copy.deepcopy(w_delta)
-    global_weights = copy.deepcopy(global_weights)
-    new_momentum = copy.deepcopy(momentum)
-    for k, v in global_weights.items():
-        new_momentum[k] = (args.momentum * momentum[k]) + w_delta[k]
-        global_weights[k] = global_weights[k] - args.global_lr * new_momentum[k]
-        #global_weights[k] = global_weights[k] - (args.momentum * momentum[k]) - w_delta[k] #equivalent
-    return new_momentum, global_weights
-
-def update_momentum(args, momentum, prev_global_weights, global_weights):
-    # option for sgd with weight decay and nesterov accelerate gradient as outlined in FedAvgM paper by Hsu et al.
-    # TODO: fix, not working
-    '''optimizer = torch.optim.SGD(global_model.parameters(), lr=args.global_lr, weight_decay=0.004, momentum=args.momentum, nesterov=True)
-    #optimizer = torch.optim.SGD(global_model.parameters(), args.momentum)
-    global_model.zero_grad()
-    # manually set grads
-    grad_idx = 0
-    with torch.no_grad():
-        for param in global_model.parameters():
-            param.grad = grad_avg[tensor_keys[grad_idx]]
-            grad_idx += 1
-    optimizer.step()'''
-
-    momentum = copy.deepcopy(momentum)
-    momentum_update = copy.deepcopy(momentum)
-    global_weights = copy.deepcopy(global_weights)
-    prev_global_weights = copy.deepcopy(prev_global_weights)
-
-    # calculate weight delta
-    global_w_delta = get_delta(prev_global_weights, global_weights)
-
-    # update momentum
-    for k, v in global_weights.items():
-        momentum_update[k] = (args.momentum * momentum[k]) + global_w_delta[k]
-
-    # add momentum to global update. current global weights are (w - delta_w)
-    # momentum update is (w - beta*momentum - delta_w) --> (global_weight -beta*new_momentum)
-        global_weights[k] = global_weights[k] - args.global_lr * momentum_update[k]
-
-    return momentum_update, global_weights
-
-   # set random values for learning rates, local epochs, local batch size for hyperparameter search
 def set_random_args(args):
     lrs = [7E-2, 5E-2, 3E-2, 1E-2, 7E-3, 5E-3, 3E-3, 1E-3, 7E-4]
     args.local_bs = random.randrange(5, 120, 5)  # sets a local batch size between 5 and 125 (intervals of 5)

@@ -18,7 +18,7 @@ class DatasetSplit(Dataset):
         image, label = self.dataset[self.idxs[item]]
         return torch.tensor(image), torch.tensor(label)
 
-def get_client_labels(dataset, user_groups, num_workers, num_classes, proportions=False):
+def get_client_labels(dataset, user_groups, num_workers, num_classes, proportions=False, subset_idxs=None):
     """
     Creates a List containing the set of all labels present in both train and validation sets for each client,
     optionally returns this list of present lables or a List of proportions of each class in the dataset
@@ -50,12 +50,16 @@ def get_client_labels(dataset, user_groups, num_workers, num_classes, proportion
 
     if proportions:
         client_groups = user_groups.items()
+        if subset_idxs is not None:
+            client_groups = [client_groups[i] for i in range(len(client_groups)) if i in subset_idxs]
         client_labels = []
         client_proportions = []
         for client in client_groups:
             unique_labels, label_proportions = get_labels(np.concatenate((client[1]['train'], client[1]['validation']), axis=0))
             client_labels.append(unique_labels)
             client_proportions.append(label_proportions)
+        if subset_idxs is not None:
+            client_proportions = np.average(client_proportions, axis=0)
         return client_proportions
     else:
         client_groups = user_groups.items()

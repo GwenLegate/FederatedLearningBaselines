@@ -69,6 +69,12 @@ class FedAvgServer(object):
             m = max(int(self.args.frac * self.args.num_clients), 1)
             idxs_clients = np.random.choice(range(self.args.num_clients), m, replace=False)
 
+            # get proportions of client labels seen at each round (for ncm eval purposes)
+            if self.args.ncm == 1:
+                label_prpos = get_client_labels(train_dataset, user_groups, self.args.num_workers, self.args.num_classes,
+                                                proportions=True, subset_idxs=idxs_clients)
+                print(f'label proportions for round: {label_prpos}')
+
             # for each selected client, init model weights with global weights and train lcl model for local_ep epochs
             for idx in idxs_clients:
                 local_model = FedAvgClient(args=self.args, train_dataset=train_dataset, validation_dataset=validation_dataset,
