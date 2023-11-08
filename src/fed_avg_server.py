@@ -94,8 +94,7 @@ class FedAvgServer(object):
                     class_sums += results[1]
                     '''print(f'CLASS SUMS UPDATE: {class_sums}')
                     print(f'CLASS SUMS: {class_sums}')'''
-            if epoch == 5:
-                exit()
+
             loss_avg = sum(local_losses) / len(local_losses)
             train_loss.append(loss_avg)
 
@@ -109,12 +108,9 @@ class FedAvgServer(object):
             # replace any nans from dividing by zero class samples with previous class means
             for i, c in enumerate(class_count):
                 if c == 0:
-                    print(f'pre cm: {class_means[i]}')
                     class_means[i] = prev_class_means[i]
-                    print(f'post cm: {class_means[i]}')
 
             prev_class_means = class_means
-            print(class_means)
             global_model.linear.weight.data = torch.nn.functional.normalize(class_means)
 
 
