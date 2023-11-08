@@ -43,7 +43,7 @@ class FedAvgServer(object):
             global_model, user_groups = load_past_model(self.args, global_model)
         # ncm init if using ncm
         if self.args.ncm:
-            global_model = ncm(self.args, global_model, train_dataset, user_groups)
+            global_model, prev_class_means = ncm(self.args, global_model, train_dataset, user_groups, [i for i in range(self.args.num_classes)])
 
         # set best acc to update saved global model
         val_acc, _ = validation_inference(self.args, global_model, validation_dataset_global,
@@ -62,6 +62,11 @@ class FedAvgServer(object):
         while epoch < self.args.epochs:
             local_losses = []
             local_weights = []
+            if self.args.ncm:
+                class_count = torch.zeros(self.args.num_classes).to(self.args.device)
+                class_sums = torch.zeros((self.args.num_classes, 512)).to(self.args.device)
+                print(f'CLASS COUNT: {class_count}')
+                print(f'CLASS SUMS: {class_sums}')
 
             global_round = f'\n | Global Training Round : {epoch + 1} |\n'
             print(global_round)
@@ -70,7 +75,7 @@ class FedAvgServer(object):
             idxs_clients = np.random.choice(range(self.args.num_clients), m, replace=False)
 
             # get proportions of client labels seen at each round (for ncm eval purposes)
-            if self.args.ncm == 1:
+            if self.args.ncm:
                 label_prpos = get_client_labels(train_dataset, user_groups, self.args.num_workers, self.args.num_classes,
                                                 proportions=True, subset_idxs=idxs_clients)
                 print(f'label proportions for round: {label_prpos}')
@@ -84,6 +89,13 @@ class FedAvgServer(object):
                 local_weights.append(copy.deepcopy(w))
                 local_losses.append(copy.deepcopy(loss))
 
+                if self.args.ncm:
+                    class_count += results[0]
+                    class_sums += results[1]
+                    '''print(f'CLASS SUMS UPDATE: {class_sums}')
+                    print(f'CLASS SUMS: {class_sums}')'''
+            if epoch == 5:
+                exit()
             loss_avg = sum(local_losses) / len(local_losses)
             train_loss.append(loss_avg)
 
@@ -91,17 +103,25 @@ class FedAvgServer(object):
             global_weights = average_weights(local_weights)
             global_model.load_state_dict(global_weights)
 
+            # replace last layer with NCM using data from participating clients
+            class_means = torch.div(class_sums, torch.reshape(class_count, (-1, 1)))
+
+            # replace any nans from dividing by zero class samples with previous class means
+            for i, c in enumerate(class_count):
+                if c == 0:
+                    print(f'pre cm: {class_means[i]}')
+                    class_means[i] = prev_class_means[i]
+                    print(f'post cm: {class_means[i]}')
+
+            prev_class_means = class_means
+            print(class_means)
+            global_model.linear.weight.data = torch.nn.functional.normalize(class_means)
+
+
             # Test global model inference on validation set after each round use model save criteria
             val_acc, val_loss = validation_inference(self.args, global_model, validation_dataset_global, self.args.num_workers)
             print(f'Epoch {epoch} Validation Accuracy {val_acc * 100}% \nValidation Loss {val_loss} '
                   f'\nTraining Loss (average loss of clients evaluated on their own in distribution validation set): {loss_avg}')
-
-            # Test with NCM reset
-            '''if self.args.ncm:
-                global_model = ncm(self.args, global_model, train_dataset, user_groups)
-                val_acc, val_loss = validation_inference(self.args, global_model, validation_dataset_global,
-                                                         self.args.num_workers)
-                print(f'\tNCM Validation Accuracy {val_acc * 100}% \nNCM Validation Loss {val_loss} ')'''
 
             if val_acc > best_acc:
                 # save model if it is best acc

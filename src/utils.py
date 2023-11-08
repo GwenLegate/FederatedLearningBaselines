@@ -210,25 +210,24 @@ def compute_accuracy(model, dataloader, device):
 
     return correct / float(total)
 
-
-def ncm(args, model, train_dataset, user_groups, client_idx=None):
+def ncm(args, model, train_dataset, user_groups, client_idxs):
     model = copy.deepcopy(model)
     class_sums = torch.zeros((args.num_classes, 512)).to(args.device)
     class_count = torch.zeros(args.num_classes).to(args.device)
     model.to(args.device)
+    round_idxs = None
 
-    # combine indices for training sets of each client
-    if client_idx is None:
-        for i in range(args.num_clients):
-            if i == 0:
-                train_idxs = user_groups[i]['train']
+    # combine indicies for training sets used in this round
+    for i in range(args.num_clients):
+        if i in client_idxs:
+            if round_idxs is None:
+                round_idxs = user_groups[i]['train']
             else:
-                train_idxs = np.concatenate((train_idxs, user_groups[i]['train']), axis=0)
-    else:
-        train_idxs = user_groups[client_idx]['train']
+                round_idxs = np.concatenate((round_idxs, user_groups[i]['train']), axis=0)
 
-    trainloader = DataLoader(DatasetSplit(train_dataset, train_idxs),
-                             batch_size=512, shuffle=True, num_workers=args.num_workers, pin_memory=True)
+    round_samples = DatasetSplit(train_dataset, round_idxs)
+
+    trainloader = DataLoader(round_samples, batch_size=512, shuffle=True, num_workers=args.num_workers, pin_memory=True)
 
     for batch_idx, (data, target) in enumerate(trainloader):
         data, target = data.to(args.device), target.to(args.device)
@@ -239,8 +238,5 @@ def ncm(args, model, train_dataset, user_groups, client_idx=None):
             class_sums[t] += features[i].data.squeeze()
             class_count[t] += 1
     class_means = torch.div(class_sums, torch.reshape(class_count, (-1, 1)))
-    cos_sim = torch.nn.CosineSimilarity(dim=0)
-    if client_idx is None:
-        print(f'cosine similarity of last layer after training and NCM update {cos_sim(torch.flatten(model.linear.weight.data), torch.flatten(torch.nn.functional.normalize(class_means)))}')
     model.linear.weight.data = torch.nn.functional.normalize(class_means)
-    return model.to('cpu')
+    return model.to('cpu'), class_means

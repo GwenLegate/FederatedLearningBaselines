@@ -6,8 +6,8 @@ import torch
 import numpy as np
 from torch import nn
 from torch.utils.data import DataLoader
+import torch.nn.functional as F
 from src.client_utils import DatasetSplit, train_test
-from src.utils import ncm
 
 class FedAvgClient(object):
     def __init__(self, args, train_dataset, validation_dataset, idx, client_labels, all_client_data):
@@ -153,9 +153,30 @@ class FedAvgClient(object):
             epoch_loss.append(sum(batch_loss)/len(batch_loss))
 
         if self.args.ncm:
-            model = ncm(self.args, model, self.train_dataset, self.all_client_data, self.client_idx)
+            optional_eval_results = self.client_ncm(model)
         model.to('cpu')
         return model.state_dict(), sum(epoch_loss) / len(epoch_loss), optional_eval_results
+
+    def client_ncm(self, model):
+        model = copy.deepcopy(model)
+        class_sums = torch.zeros((self.args.num_classes, 512)).to(self.args.device)
+        class_count = torch.zeros(self.args.num_classes).to(self.args.device)
+        model.to(self.args.device)
+        client_samples = DatasetSplit(self.train_dataset, self.train_idxs)
+
+        trainloader = DataLoader(client_samples, batch_size=512, shuffle=True, num_workers=self.args.num_workers,
+                                 pin_memory=True)
+
+        for batch_idx, (data, target) in enumerate(trainloader):
+            data, target = data.to(self.args.device), target.to(self.args.device)
+            features = torch.nn.Sequential(*list(model.children())[:-1])(data)
+            features = F.adaptive_avg_pool2d(features, 1).squeeze()
+
+            for i, t in enumerate(target):
+                class_sums[t] += features[i].data.squeeze()
+                class_count[t] += 1
+        # modify class count so that classes with zero samples divide by 1 instead of zero
+        return [class_count, class_sums]
 
     def evaluate_client_model(self, idxs_clients, model):
         """ evaluates an individual client model on the datasets of all other clients selected for this round
