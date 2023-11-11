@@ -175,7 +175,6 @@ class FedAvgClient(object):
             for i, t in enumerate(target):
                 class_sums[t] += features[i].data.squeeze()
                 class_count[t] += 1
-        # modify class count so that classes with zero samples divide by 1 instead of zero
         return [class_count, class_sums]
 
     def evaluate_client_model(self, idxs_clients, model):

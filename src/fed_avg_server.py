@@ -65,8 +65,6 @@ class FedAvgServer(object):
             if self.args.ncm:
                 class_count = torch.zeros(self.args.num_classes).to(self.args.device)
                 class_sums = torch.zeros((self.args.num_classes, 512)).to(self.args.device)
-                print(f'CLASS COUNT: {class_count}')
-                print(f'CLASS SUMS: {class_sums}')
 
             global_round = f'\n | Global Training Round : {epoch + 1} |\n'
             print(global_round)
@@ -89,12 +87,6 @@ class FedAvgServer(object):
                 local_weights.append(copy.deepcopy(w))
                 local_losses.append(copy.deepcopy(loss))
 
-                if self.args.ncm:
-                    class_count += results[0]
-                    class_sums += results[1]
-                    '''print(f'CLASS SUMS UPDATE: {class_sums}')
-                    print(f'CLASS SUMS: {class_sums}')'''
-
             loss_avg = sum(local_losses) / len(local_losses)
             train_loss.append(loss_avg)
 
@@ -102,17 +94,20 @@ class FedAvgServer(object):
             global_weights = average_weights(local_weights)
             global_model.load_state_dict(global_weights)
 
-            # replace last layer with NCM using data from participating clients
-            class_means = torch.div(class_sums, torch.reshape(class_count, (-1, 1)))
+            if self.args.ncm:
+                class_count += results[0]
+                class_sums += results[1]
 
-            # replace any nans from dividing by zero class samples with previous class means
-            for i, c in enumerate(class_count):
-                if c == 0:
-                    class_means[i] = prev_class_means[i]
+                # replace last layer with NCM using data from participating clients
+                class_means = torch.div(class_sums, torch.reshape(class_count, (-1, 1)))
 
-            prev_class_means = class_means
-            global_model.linear.weight.data = torch.nn.functional.normalize(class_means)
+                # replace any nans from dividing by zero class samples with previous class means
+                for i, c in enumerate(class_count):
+                    if c == 0:
+                        class_means[i] = prev_class_means[i]
 
+                prev_class_means = class_means
+                global_model.linear.weight.data = torch.nn.functional.normalize(class_means)
 
             # Test global model inference on validation set after each round use model save criteria
             val_acc, val_loss = validation_inference(self.args, global_model, validation_dataset_global, self.args.num_workers)
