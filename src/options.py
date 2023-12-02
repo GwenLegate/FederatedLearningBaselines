@@ -27,6 +27,7 @@ def args_parser():
     parser.add_argument('--client_lr', type=float, default=0.1, help='learning rate for client models')
     parser.add_argument('--momentum', type=float, default=0.9, help='SGD momentum, momentum parameter. default is 0.9 ')
     parser.add_argument('--ncm', type=int, default=0, help='train using last layer FedNCM if FedNCM is 1, else train normally')
+    parser.add_argument('--ncm_participation', type=float, default=1, help='fraction of clients to participate in NCM updates, default full NCM participation')
     parser.add_argument('--freeze_ll', type=int, default=0, help='freeze last layer if =1, else train normally')
     parser.add_argument('--model', type=str, default='resnet18',
                         help='model name, options: ResNet18, ResNet34, ResNet50, ResNet101, ResNet152')

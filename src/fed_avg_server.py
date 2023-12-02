@@ -47,7 +47,9 @@ class FedAvgServer(object):
 
         # ncm init if using ncm
         if self.args.ncm:
-            global_model, prev_class_means = ncm(self.args, global_model, train_dataset, user_groups, [i for i in range(self.args.num_classes)])
+            n = max(int(self.args.ncm_participation * self.args.num_clients), 1)
+            idxs_ncm_clients = np.random.choice(range(self.args.num_clients), n, replace=False)
+            global_model = ncm(self.args, global_model, train_dataset, user_groups, idxs_ncm_clients)
 
         # set best acc to update saved global model
         val_acc, _ = validation_inference(self.args, global_model, validation_dataset_global,
@@ -66,21 +68,28 @@ class FedAvgServer(object):
         while epoch < self.args.epochs:
             local_losses = []
             local_weights = []
-            if self.args.ncm:
+            '''if self.args.ncm:
                 class_count = torch.zeros(self.args.num_classes).to(self.args.device)
-                class_sums = torch.zeros((self.args.num_classes, 512)).to(self.args.device)
+                class_sums = torch.zeros((self.args.num_classes, 512)).to(self.args.device)'''
 
             global_round = f'\n | Global Training Round : {epoch + 1} |\n'
             print(global_round)
 
-            m = max(int(self.args.frac * self.args.num_clients), 1)
-            idxs_clients = np.random.choice(range(self.args.num_clients), m, replace=False)
+            if self.args.ncm:
+                m = max(int(self.args.frac * self.args.num_clients), 1)
+                n = max(int(self.args.ncm_participation * self.args.num_clients), 1)
+                idxs_ncm_clients = np.random.choice(range(self.args.num_clients), n, replace=False)
+                idxs_clients = np.random.choice(idxs_ncm_clients, m, replace=False)
+                print(f'ncm client idxs: {idxs_ncm_clients}\nclient idxs: {idxs_clients}')
+            else:
+                m = max(int(self.args.frac * self.args.num_clients), 1)
+                idxs_clients = np.random.choice(range(self.args.num_clients), m, replace=False)
 
             # get proportions of client labels seen at each round (for ncm eval purposes)
-            if self.args.ncm:
+            '''if self.args.ncm:
                 label_prpos = get_client_labels(train_dataset, user_groups, self.args.num_workers, self.args.num_classes,
                                                 proportions=True, subset_idxs=idxs_clients)
-                print(f'label proportions for round: {label_prpos}')
+                print(f'label proportions for round: {label_prpos}')'''
 
             # for each selected client, init model weights with global weights and train lcl model for local_ep epochs
             for idx in idxs_clients:
@@ -99,7 +108,7 @@ class FedAvgServer(object):
             global_model.load_state_dict(global_weights)
 
             if self.args.ncm:
-                class_count += results[0]
+                '''class_count += results[0]
                 class_sums += results[1]
 
                 # replace last layer with NCM using data from participating clients
@@ -108,10 +117,11 @@ class FedAvgServer(object):
                 # replace any nans from dividing by zero class samples with previous class means
                 for i, c in enumerate(class_count):
                     if c == 0:
-                        class_means[i] = prev_class_means[i]
+                        class_means[i] = prev_class_means[i]'''
+                global_model = ncm(self.args, global_model, train_dataset, user_groups, idxs_ncm_clients)
 
-                prev_class_means = class_means
-                global_model.linear.weight.data = torch.nn.functional.normalize(class_means)
+                #prev_class_means = class_means
+                #global_model.linear.weight.data = torch.nn.functional.normalize(class_means)
 
             # Test global model inference on validation set after each round use model save criteria
             val_acc, val_loss = validation_inference(self.args, global_model, validation_dataset_global, self.args.num_workers)

@@ -239,4 +239,4 @@ def ncm(args, model, train_dataset, user_groups, client_idxs):
             class_count[t] += 1
     class_means = torch.div(class_sums, torch.reshape(class_count, (-1, 1)))
     model.linear.weight.data = torch.nn.functional.normalize(class_means)
-    return model.to('cpu'), class_means
+    return model.to('cpu')#, class_means
