@@ -43,7 +43,6 @@ def args_parser():
     parser.add_argument('--dataset', type=str, default='cifar10',
                         help="name of dataset. mnist, fmnist, cifar10, cifar100")
     parser.add_argument('--num_classes', type=int, default=10, help="number of classes")
-    parser.add_argument('--optimizer', type=str, default='sgd', help="type of optimizer (adam or sgd)")
     parser.add_argument('--decay', type=int, default=0,
                         help="Use learning rate decay. 1->use 0->don't use. Default = 0.")
     parser.add_argument('--iid', type=int, default=0, help='Default set to non-IID. Set to 1 for IID.')
