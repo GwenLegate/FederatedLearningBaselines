@@ -14,8 +14,8 @@ from torch.utils.data import DataLoader
 if __name__ == "__main__":
     args = args_parser()
     dataset_config(args)
-    # run_dir = './run_data/'
-    run_dir = f'/scratch/{os.environ.get("USER", "glegate")}/{args.wandb_run_name}'
+    run_dir = './run_data/'
+    #run_dir = f'/scratch/{os.environ.get("USER", "glegate")}/{args.wandb_run_name}'
     args.norm = 'batch_norm'
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     model = get_model(args).to(device)

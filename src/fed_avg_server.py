@@ -27,20 +27,23 @@ class FedAvgServer(object):
         last_hundred_test_loss, last_hundred_test_acc, last_hundred_val_loss, last_hundred_val_acc = zero_last_hundred()
         # load dataset
         train_dataset, validation_dataset, test_dataset = get_dataset(self.args)
-        # splits dataset among clients
-        user_groups = split_dataset(train_dataset, self.args)
-        # save the user_groups dictionary for later access
-        user_groups_to_save = f'{run_dir}/user_groups.pt'
-        torch.save(user_groups, user_groups_to_save)
-        # list of set of labels present for each client
-        client_labels = get_client_labels(train_dataset, user_groups, self.args.num_workers, self.args.num_classes)
-        # get validation ds by combining indicies for validation sets of each client
-        validation_dataset_global = get_validation_ds(self.args.num_clients, user_groups, validation_dataset)
+
         # init server model
         global_model = get_model(self.args)
         # if this run is a continuation of training for a failed run, load previous model and client distributions
         if len(self.args.continue_train) > 0:
             global_model, user_groups = load_past_model(self.args, global_model)
+        else:
+            # splits dataset among clients
+            user_groups = split_dataset(train_dataset, self.args)
+            # save the user_groups dictionary for later access
+            user_groups_to_save = f'{run_dir}/user_groups.pt'
+            torch.save(user_groups, user_groups_to_save)
+
+        # list of set of labels present for each client
+        client_labels = get_client_labels(train_dataset, user_groups, self.args.num_workers, self.args.num_classes)
+        # get validation ds by combining indicies for validation sets of each client
+        validation_dataset_global = get_validation_ds(self.args.num_clients, user_groups, validation_dataset)
 
         # set best acc to update saved global model
         val_acc, _ = validation_inference(self.args, global_model, validation_dataset_global,
