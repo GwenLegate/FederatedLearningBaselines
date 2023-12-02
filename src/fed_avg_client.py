@@ -96,19 +96,16 @@ class FedAvgClient(object):
     def train_client(self, model, global_round):
         # Set mode to train model
         model.to(self.device)
-        if self.args.freeze_ll == 1 and self.args.ncm == 1:
+        '''if self.args.freeze_ll == 1 and self.args.ncm == 1:
             model.linear.weight.requires_grad = False
-            model.linear.bias.requires_grad = False
+            model.linear.bias.requires_grad = False'''
         model.train()
         epoch_loss = []
         # optional variable to return required params as needed
         optional_eval_results = None
 
         # Set optimizer for the local updates
-        if self.args.optimizer == 'sgd':
-            optimizer = torch.optim.SGD(model.parameters(), lr=self.lr, weight_decay=1e-4)
-        elif self.args.optimizer == 'adam':
-            optimizer = torch.optim.Adam(model.parameters(), lr=self.lr, weight_decay=1e-4)
+        optimizer = torch.optim.SGD(model.parameters(), lr=self.lr, weight_decay=1e-4)
 
         # learning rate decay
         if self.args.decay == 1:
@@ -152,8 +149,8 @@ class FedAvgClient(object):
                         break
             epoch_loss.append(sum(batch_loss)/len(batch_loss))
 
-        if self.args.ncm:
-            optional_eval_results = self.client_ncm(model)
+        '''if self.args.ncm:
+            optional_eval_results = self.client_ncm(model)'''
         model.to('cpu')
         return model.state_dict(), sum(epoch_loss) / len(epoch_loss), optional_eval_results
 
