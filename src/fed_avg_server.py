@@ -80,7 +80,6 @@ class FedAvgServer(object):
                 n = max(int(self.args.ncm_participation * self.args.num_clients), 1)
                 idxs_ncm_clients = np.random.choice(range(self.args.num_clients), n, replace=False)
                 idxs_clients = np.random.choice(idxs_ncm_clients, m, replace=False)
-                print(f'ncm client idxs: {idxs_ncm_clients}\nclient idxs: {idxs_clients}')
             else:
                 m = max(int(self.args.frac * self.args.num_clients), 1)
                 idxs_clients = np.random.choice(range(self.args.num_clients), m, replace=False)
