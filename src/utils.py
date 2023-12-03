@@ -170,7 +170,6 @@ def wandb_setup(args, model, run_dir, central=False):
             "local epochs (E)": args.local_ep,
             "local iters": args.local_iters,
             "local batch size (B)": args.local_bs,
-            "optimizer": args.optimizer,
             "dirichlet": args.dirichlet,
             "alpha": args.alpha,
             "norm": args.norm,
