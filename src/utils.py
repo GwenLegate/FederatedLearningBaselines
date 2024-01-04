@@ -211,7 +211,9 @@ def compute_accuracy(model, dataloader, device):
 
 def ncm(args, model, train_dataset, user_groups, client_idxs):
     model = copy.deepcopy(model)
-    class_sums = torch.zeros((args.num_classes, 512)).to(args.device)
+    layers = model.state_dict()
+    feature_output_dim = layers['linear.weight'].size()[1]
+    class_sums = torch.zeros((args.num_classes, feature_output_dim)).to(args.device)
     class_count = torch.zeros(args.num_classes).to(args.device)
     model.to(args.device)
     round_idxs = None
