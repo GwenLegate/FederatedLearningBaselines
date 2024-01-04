@@ -27,6 +27,7 @@ class FedAvgServer(object):
         last_hundred_test_loss, last_hundred_test_acc, last_hundred_val_loss, last_hundred_val_acc = zero_last_hundred()
         # load dataset
         train_dataset, validation_dataset, test_dataset = get_dataset(self.args)
+        print(test_dataset.targets)
 
         # init server model
         global_model = get_model(self.args)
@@ -36,6 +37,8 @@ class FedAvgServer(object):
         else:
             # splits dataset among clients
             user_groups = split_dataset(train_dataset, self.args)
+            print(f'ln 39 user groups:\n{user_groups}')
+            exit()
             # save the user_groups dictionary for later access
             user_groups_to_save = f'{run_dir}/user_groups.pt'
             torch.save(user_groups, user_groups_to_save)
