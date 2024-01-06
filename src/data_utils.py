@@ -2,8 +2,7 @@ import numpy as np
 from src.femnist_dataset import FEMNIST
 from src.imagenet32 import Imagenet32
 from torchvision import datasets, transforms
-from src.sampling import mnist_iid, mnist_noniid, cifar_iid, shard_noniid, equal_class_size_noniid_dirichlet, \
-    femnist_iid, unequal_class_size_noniid_dirichlet
+from src.sampling import iid_split, noniid_fedavg_split, noniid_dirichlet_equal_split
 
 def dataset_config(args):
     '''
@@ -18,6 +17,8 @@ def dataset_config(args):
         args.num_channels = 1
     if args.dataset == 'imagenet32':
         args.num_classes = 1000
+    if args.dataset == 'mnist':
+        args.num_channels = 1
 
 def get_num_samples_per_label(self, dataset_labels):
     labels = np.array(dataset_labels)
@@ -81,7 +82,7 @@ def get_dataset(args):
 
         if args.dataset == 'mnist':
             data_dir = '../data/mnist/'
-            train_dataset = datasets.MNIST(data_dir, train=True, download=False, transform=apply_transform)
+            train_dataset = datasets.MNIST(data_dir, train=True, download=True, transform=apply_transform)
             validation_dataset = datasets.MNIST(data_dir, train=True, download=False, transform=apply_transform)
             test_dataset = datasets.MNIST(data_dir, train=False, download=False, transform=apply_transform)
         else:
@@ -134,32 +135,15 @@ def split_dataset(train_dataset, args):
         'train' and 'validation' which contain the corresponding sample indices for training and validation subsets of
         each clients partition
     '''
-    if args.dataset == 'cifar10' or args.dataset == 'cifar100':
-        # sample training data amongst clients
-        if args.iid:
-            # Sample IID user data
-            user_groups = cifar_iid(train_dataset, args.num_clients)
-        else:
-            # Sample Non-IID user data
-            if args.dirichlet:
-                print(f'Creating non iid client datasets using the dirichlet distribution')
-                # non iid data distributions for clients created by dirichlet distribution
-                user_groups = equal_class_size_noniid_dirichlet(train_dataset, args.alpha, args.num_clients, args.num_classes)
-            else:
-                # non iid data distributions for clients created by dirichlet distributionvia shard method in Mcmahan(2016)
-                print(f'Creating non iid client datasets using shards')
-                user_groups = shard_noniid(train_dataset, args.num_clients)
-    elif args.dataset in ['femnist', 'imagenet32']:
+    if args.iid:
+        # Sample IID user data
+        user_groups = iid_split(train_dataset, args.num_clients)
+    else:
         if args.dirichlet:
-            user_groups = unequal_class_size_noniid_dirichlet(train_dataset, args.alpha, args.num_clients, args.num_classes)
+            print(f'Creating non iid client datasets using Dirichlet distribution')
+            user_groups = noniid_dirichlet_equal_split(train_dataset, args.alpha, args.num_clients, args.num_classes)
         else:
-            user_groups = femnist_iid(train_dataset, args.num_clients)
-    elif args.dataset == 'mnist' or args.dataset == 'fmnist':
-        # sample training data amongst clients
-        if args.iid:
-            # Sample IID user data from Mnist
-            user_groups = mnist_iid(train_dataset, args.num_clients)
-        else:
-            user_groups = mnist_noniid(train_dataset, args.num_clients)
+            print(f'Creating non iid client datasets using shards')
+            user_groups = noniid_fedavg_split(train_dataset, args.num_clients, client_shards=2)
 
     return user_groups
