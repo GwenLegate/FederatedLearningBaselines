@@ -42,6 +42,8 @@ def args_parser():
                         help="sets random values within a specified range for a hyper parameter search")
     parser.add_argument('--dataset', type=str, default='cifar10',
                         help="name of dataset. mnist, fmnist, cifar10, cifar100")
+    parser.add_argument('--frac_client_samples', type=float, default=None,
+                        help="select a fraction [0, 1] of dataset samples to train on")
     parser.add_argument('--num_classes', type=int, default=10, help="number of classes")
     parser.add_argument('--decay', type=int, default=0,
                         help="Use learning rate decay. 1->use 0->don't use. Default = 0.")

@@ -142,6 +142,9 @@ def split_dataset(train_dataset, args):
         if args.dirichlet:
             print(f'Creating non iid client datasets using Dirichlet distribution')
             user_groups = noniid_dirichlet_equal_split(train_dataset, args.alpha, args.num_clients, args.num_classes)
+            if args.frac_client_samples:
+                user_groups = noniid_dirichlet_equal_split(train_dataset, args.alpha, args.num_clients,
+                                                           args.num_classes, data_subset=args.frac_client_samples)
         else:
             print(f'Creating non iid client datasets using shards')
             user_groups = noniid_fedavg_split(train_dataset, args.num_clients, client_shards=2)

@@ -79,7 +79,7 @@ def noniid_fedavg_split(dataset, num_users, client_shards=2):
 # adapted from https://github.com/google-research/federated/blob/master/utils/datasets/cifar10_dataset.py
 # gives equally sized datasets for each client
 
-def noniid_dirichlet_equal_split(dataset, alpha, num_clients, num_classes):
+def noniid_dirichlet_equal_split(dataset, alpha, num_clients, num_classes, data_subset=None):
     """Construct a federated dataset from the centralized CIFAR-10.
     Sampling based on Dirichlet distribution over categories, following the paper
     Measuring the Effects of Non-Identical Data Distribution for
@@ -98,7 +98,10 @@ def noniid_dirichlet_equal_split(dataset, alpha, num_clients, num_classes):
         a dict where keys are client numbers from 0 to num_clients and nested dict inside of each key has keys train
         and validation containing arrays of the indicies of each sample.
         """
-    labels = np.array(dataset.targets)
+    try:
+        labels = np.array(dataset.targets)
+    except AttributeError:
+        labels = np.array(dataset.labels)
     dict_users = {}
     multinomial_vals = []
     examples_per_label = []
@@ -140,6 +143,8 @@ def noniid_dirichlet_equal_split(dataset, alpha, num_clients, num_classes):
         np.random.shuffle(np.array(client_samples[i]))
         # create 90/10 train/validation split for each client
         samples = np.array(client_samples[i])
+        if data_subset is not None:
+            samples = samples[:int(samples.shape[0] * data_subset)]
         train_idxs = samples[:int(samples.shape[0] * 0.9)].astype('int64').squeeze()
         validation_idxs = samples[int(samples.shape[0] * 0.9):].astype('int64').squeeze()
 
