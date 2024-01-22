@@ -23,7 +23,7 @@ def validation_inference(args, model, validation_dataset, num_workers):
     model.eval()
     loss, total, correct = 0.0, 0.0, 0.0
     criterion = torch.nn.CrossEntropyLoss().to(args.device)
-    valloader = DataLoader(validation_dataset, batch_size=128, shuffle=True, num_workers=num_workers, pin_memory=True)
+    valloader = DataLoader(validation_dataset, batch_size=args.local_bs, shuffle=True, num_workers=num_workers, pin_memory=True)
 
     for batch_idx, (images, labels) in enumerate(valloader):
         images, labels = images.to(args.device), labels.to(args.device)

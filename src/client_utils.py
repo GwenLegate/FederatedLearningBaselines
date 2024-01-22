@@ -75,9 +75,16 @@ def train_test(args, train_dataset, validation_dataset, train_idxs, validation_i
         Return:
             train and validation dataloaders for a client
         """
-        trainloader = DataLoader(DatasetSplit(train_dataset, train_idxs),
+        if args.accu_split is not None:
+            trainloader = DataLoader(DatasetSplit(train_dataset, train_idxs),
+                                     batch_size=int(args.local_bs/args.accu_split), shuffle=True, num_workers=num_workers, pin_memory=True)
+            validationloader = DataLoader(DatasetSplit(validation_dataset, validation_idxs),
+                                          batch_size=int(args.local_bs/args.accu_split), shuffle=False,
+                                          num_workers=num_workers, pin_memory=True)
+        else:
+            trainloader = DataLoader(DatasetSplit(train_dataset, train_idxs),
                                  batch_size=args.local_bs, shuffle=True, num_workers=num_workers, pin_memory=True)
-        validationloader = DataLoader(DatasetSplit(validation_dataset, validation_idxs),
-                                batch_size=int(len(validation_idxs)/10), shuffle=False, num_workers=num_workers, pin_memory=True)
+            validationloader = DataLoader(DatasetSplit(validation_dataset, validation_idxs),
+                                batch_size=args.local_bs, shuffle=False, num_workers=num_workers, pin_memory=True)
         return trainloader, validationloader
 

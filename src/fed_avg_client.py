@@ -137,7 +137,6 @@ class FedAvgClient(object):
                     if self.args.decay == 1:
                         scheduler.step()
                     model.zero_grad()
-
                     batch_loss.append(loss.item())
 
                 if self.args.local_iters is not None:
