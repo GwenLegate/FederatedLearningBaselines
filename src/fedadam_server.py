@@ -6,13 +6,13 @@ import copy
 import numpy as np
 import wandb
 import torch
-from src.fed_avg_client import FedAvgClient
-from src.utils import average_weights, get_model, load_past_model, run_summary, wandb_setup, zero_last_hundred
+from src.fedadam_client import FedAdamClient
+from src.utils import average_weights, get_model, load_past_model, run_summary, wandb_setup, zero_last_hundred, apply_adam_server_update
 from src.eval_utils import validation_inference, test_inference, get_validation_ds
 from src.client_utils import get_client_labels
 from src.data_utils import get_dataset, split_dataset
 
-class FedAvgServer(object):
+class FedAdamServer(object):
     def __init__(self, args):
         self.args = args
 
@@ -27,6 +27,7 @@ class FedAvgServer(object):
         last_hundred_test_loss, last_hundred_test_acc, last_hundred_val_loss, last_hundred_val_acc = zero_last_hundred()
         # load dataset
         train_dataset, validation_dataset, test_dataset = get_dataset(self.args)
+
         # init server model
         global_model = get_model(self.args)
         # if this run is a continuation of training for a failed run, load previous model and client distributions
@@ -60,7 +61,7 @@ class FedAvgServer(object):
         # **** TRAINING LOOPS STARTS HERE ****
         while epoch < self.args.epochs:
             local_losses = []
-            local_weights = []
+            local_deltas = []
 
             global_round = f'\n | Global Training Round : {epoch + 1} |\n'
             print(global_round)
@@ -69,19 +70,21 @@ class FedAvgServer(object):
             idxs_clients = np.random.choice(range(self.args.num_clients), m, replace=False)
 
             # for each selected client, init model weights with global weights and train lcl model for local_ep epochs
+            global_deltas = None
             for idx in idxs_clients:
-                local_model = FedAvgClient(args=self.args, train_dataset=train_dataset, validation_dataset=validation_dataset,
+                local_model = FedAdamClient(args=self.args, train_dataset=train_dataset, validation_dataset=validation_dataset,
                                           idx=idx, client_labels=client_labels[idx], all_client_data=user_groups)
 
-                w, loss, results = local_model.train_client(model=copy.deepcopy(global_model), global_round=epoch)
-                local_weights.append(copy.deepcopy(w))
+                deltas, loss, results = local_model.train_client(model=copy.deepcopy(global_model), global_round=epoch)
+                local_deltas.append(copy.deepcopy(deltas))
                 local_losses.append(copy.deepcopy(loss))
 
             loss_avg = sum(local_losses) / len(local_losses)
             train_loss.append(loss_avg)
 
             # update global weights with the average of the obtained local weights
-            global_weights = average_weights(local_weights)
+            global_deltas = average_weights(local_deltas)
+            global_weights = apply_adam_server_update(self.args, copy.deepcopy(global_model), global_deltas)
             global_model.load_state_dict(global_weights)
 
             # Test global model inference on validation set after each round use model save criteria
