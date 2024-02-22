@@ -102,10 +102,7 @@ class FedAvgMClient(object):
         optional_eval_results = None
 
         # Set optimizer for the local updates
-        if self.args.optimizer == 'sgd':
-            optimizer = torch.optim.SGD(model.parameters(), lr=self.lr, weight_decay=1e-4)
-        elif self.args.optimizer == 'adam':
-            optimizer = torch.optim.Adam(model.parameters(), lr=self.lr, weight_decay=1e-4)
+        optimizer = torch.optim.SGD(model.parameters(), lr=self.lr, weight_decay=1e-4)
 
         # learning rate decay
         if self.args.decay == 1:
