@@ -25,5 +25,5 @@ Experiemnts were conducted matching as closely as possible to the federated hype
 | FedADAM  |78.0 +/- 2.2            | `federated_main.py --epochs=4000 --fed_type=fedadam --global_lr=0.0316 --beta1=0.9 --beta2=0.999 --adam_eps=0.01 --client_lr=0.01 --num_clients=450 --frac=0.023 --local_ep=1 --local_bs=20 --num_workers=16`                                            |
 
 sample training curves and their final accuracies for each of the three baselines currently implemented
-![alt text](https://github.com/GwenLegate/FederatedLearningBaseline/blob/master/figs/curves.png?raw=true)
+![alt text](https://github.com/GwenLegate/FederatedLearningBaselines/blob/master/figs/curves.png?raw=true)
 
