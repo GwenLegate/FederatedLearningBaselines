@@ -15,7 +15,8 @@ def args_parser():
     parser.add_argument("--offline", type=bool, default=False, help="set wandb to run in offline mode")
     parser.add_argument('--num_workers', type=int, default=1, help="how many subprocesses to use for data loading.")
     parser.add_argument('--epochs', type=int, default=4000, help="number of rounds of training")
-    parser.add_argument("--fed_type", type=str, default='fedavg', help="chose federated algorithm. fedavg, fedavgm implemented (so far)")
+    parser.add_argument("--fed_type", type=str, default='fedavg',
+                        help="chose federated algorithm. fedavg, fedavgm, fedadam implemented (so far)")
     parser.add_argument('--num_clients', type=int, default=100, help="number of clients: K")
     parser.add_argument('--frac', type=float, default=0.1, help='the fraction of clients: C')
     parser.add_argument('--local_ep', type=int, default=3, help="the number of local epochs: E")
@@ -26,6 +27,10 @@ def args_parser():
                         help='learning rate for global model, always 1 for FedAvg version')
     parser.add_argument('--client_lr', type=float, default=0.1, help='learning rate for client models')
     parser.add_argument('--momentum', type=float, default=0.9, help='SGD momentum, momentum parameter. default is 0.9 ')
+    parser.add_argument('--beta1', type=float, default=0.9, help='ADAM beta1 for FedADAM')
+    parser.add_argument('--beta2', type=float, default=0.999, help='ADAM beta2 for FedADAM')
+    parser.add_argument('--adam_eps', type=float, default=0.01,
+                        help='ADAM epsilon value (tau in Reddi et. al.), controls degree of adaptivity.')
     parser.add_argument('--model', type=str, default='resnet18',
                         help='model name, options: ResNet18, ResNet34, ResNet50, ResNet101, ResNet152')
     parser.add_argument('--width', type=int, default=2, help='model width factor')

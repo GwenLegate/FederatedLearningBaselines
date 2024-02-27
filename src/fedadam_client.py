@@ -6,9 +6,10 @@ import torch
 import numpy as np
 from torch import nn
 from torch.utils.data import DataLoader
+import torch.nn.functional as F
 from src.client_utils import DatasetSplit, train_test
 
-class FedAvgMClient(object):
+class FedAdamClient(object):
     def __init__(self, args, train_dataset, validation_dataset, idx, client_labels, all_client_data):
         self.args = args
         self.client_idx = idx
@@ -25,12 +26,20 @@ class FedAvgMClient(object):
         # set of all labels (training and validation) in the client dataset
         self.labels = client_labels
         self.client_data_proportions = self.data_proportions()
+        self.base_model = None
 
-    def get_model(self):
+    def get_base_model(self):
         """
-        Returns local model after update
+        Returns model weights from the beginning of the round
         """
-        return self.model_after_training
+        return self.base_model
+
+    def set_base_model(self, model):
+        """
+        sets initial weights
+        """
+        self.base_model = copy.deepcopy(model.to('cpu'))
+        model.to(self.device)
 
     def get_client_labels(self, dataset, train_idxs, validation_idxs, num_workers, unique=True):
         """
@@ -65,43 +74,33 @@ class FedAvgMClient(object):
 
         return count_client_labels / count_labels
 
-    def compute_grad(self, model):
+    def get_deltas(self, model):
         """
-        independently computes the gradient for evaluation purposes for one step without affecting the regular training.
-        uses batch size that is the entire client dataset for this step
+        Computes deltas -ie. the difference between the initial and final model weights for local training
         Args:
-            model: the model to use for the gradient computation
-        Returns:
-            state dict of gradients
+             model: the updated model obtained post training
+        Returns: delta values for all model parmaeters where RequiresGrad=True in a dict
         """
-        trainloader = DataLoader(DatasetSplit(self.train_dataset, self.train_idxs),
-                                 batch_size=int(len(self.train_idxs)), shuffle=True, num_workers=self.args.num_workers,
-                                 pin_memory=True)
-        model.train()
-        for batch_idx, (images, labels) in enumerate(trainloader):
-            images, labels = images.to(self.device), labels.to(self.device)
+        m = model.state_dict()
+        base_m = self.base_model.state_dict()
 
-            model.zero_grad()
-            logits = model(images)
+        for key in m.keys():
+            if 'batches' in key or 'running' in key:
+                base_m[key].data = m[key].data
+            else:
+                base_m[key].data -= m[key].data
 
-            if self.args.mask:
-                logits = self.weighted_log_softmax(logits)
-
-            loss = self.criterion(logits, labels)
-            loss.backward()
-            grad_dict = {k:v.grad for k, v in zip(model.state_dict(), model.parameters())}
-            return grad_dict
+        return base_m
 
     def train_client(self, model, global_round):
-        initial_weights = copy.deepcopy(model.to('cpu')).state_dict()
-        # Set mode to train model
+        self.set_base_model(model)
         model.to(self.device)
         model.train()
         epoch_loss = []
         # optional variable to return required params as needed
         optional_eval_results = None
 
-        # Set optimizer for the local updates
+        # Set SGD optimizer for local updates
         optimizer = torch.optim.SGD(model.parameters(), lr=self.lr, weight_decay=1e-4)
 
         # learning rate decay
@@ -146,8 +145,8 @@ class FedAvgMClient(object):
             epoch_loss.append(sum(batch_loss)/len(batch_loss))
 
         model.to('cpu')
-        delta = self._get_delta(copy.deepcopy(model).state_dict(), initial_weights)
-        return delta, sum(epoch_loss) / len(epoch_loss), optional_eval_results
+        deltas = self.get_deltas(model)
+        return deltas, sum(epoch_loss) / len(epoch_loss), optional_eval_results
 
     def evaluate_client_model(self, idxs_clients, model):
         """ evaluates an individual client model on the datasets of all other clients selected for this round
@@ -191,20 +190,3 @@ class FedAvgMClient(object):
         accuracy = correct / total
         model.to('cpu')
         return accuracy, loss
-
-    def _get_delta(self, params1, params2):
-        '''
-        Computes delta of model weights or gradients (params2-params1)
-        grad update w+ = w - delta_w --> delta_w = w - w+
-        Args:
-            params1: state dict of weights or gradients
-            params2: state dict of weights or gradients
-        Returns:
-            state dict of the delta between params1 and params2
-        '''
-        params1 = copy.deepcopy(params1)
-        params2 = copy.deepcopy(params2)
-        for k, _ in params1.items():
-            params2[k] = params2[k].float()
-            params2[k] -= params1[k].float()
-        return params2
