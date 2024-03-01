@@ -3,6 +3,7 @@ from src.femnist_dataset import FEMNIST
 from src.imagenet32 import Imagenet32
 from torchvision import datasets, transforms
 from src.sampling import iid_split, noniid_fedavg_split, noniid_dirichlet_equal_split
+import ssl
 
 def dataset_config(args):
     '''
@@ -31,6 +32,7 @@ def get_dataset(args):
     """
     Returns train, validation and test datasets
     """
+    ssl._create_default_https_context = ssl._create_unverified_context
     if args.dataset == 'cifar10' or args.dataset == 'cifar100':
         data_dir = '../data/'
 
