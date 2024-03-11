@@ -7,7 +7,7 @@ import numpy as np
 import wandb
 import torch
 from src.fed_avg_client import FedAvgClient
-from src.utils import average_weights, get_model, load_past_model, run_summary, wandb_setup, zero_last_hundred
+from src.utils import average_params, apply_server_update, get_model, load_past_model, run_summary, wandb_setup, zero_last_hundred
 from src.eval_utils import validation_inference, test_inference, get_validation_ds
 from src.client_utils import get_client_labels
 from src.data_utils import get_dataset, split_dataset
@@ -60,7 +60,7 @@ class FedAvgServer(object):
         # **** TRAINING LOOPS STARTS HERE ****
         while epoch < self.args.epochs:
             local_losses = []
-            local_weights = []
+            local_deltas = []
 
             global_round = f'\n | Global Training Round : {epoch + 1} |\n'
             print(global_round)
@@ -73,16 +73,17 @@ class FedAvgServer(object):
                 local_model = FedAvgClient(args=self.args, train_dataset=train_dataset, validation_dataset=validation_dataset,
                                           idx=idx, client_labels=client_labels[idx], all_client_data=user_groups)
 
-                w, loss, results = local_model.train_client(model=copy.deepcopy(global_model), global_round=epoch)
-                local_weights.append(copy.deepcopy(w))
+                deltas, loss, results = local_model.train_client(model=copy.deepcopy(global_model), global_round=epoch)
+                local_deltas.append(copy.deepcopy(deltas))
                 local_losses.append(copy.deepcopy(loss))
 
             loss_avg = sum(local_losses) / len(local_losses)
             train_loss.append(loss_avg)
 
             # update global weights with the average of the obtained local weights
-            global_weights = average_weights(local_weights)
-            global_model.load_state_dict(global_weights)
+            global_deltas = average_params(local_deltas)
+            model_updated = apply_server_update(self.args, copy.deepcopy(global_model), global_deltas)
+            global_model.load_state_dict(model_updated)
 
             # Test global model inference on validation set after each round use model save criteria
             val_acc, val_loss = validation_inference(self.args, global_model, validation_dataset_global, self.args.num_workers)

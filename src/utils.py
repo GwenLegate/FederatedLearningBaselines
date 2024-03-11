@@ -14,7 +14,7 @@ import os
 import numpy as np
 from src.models import ResNet34, ResNet18, ResNet50, ResNet101, ResNet152
 
-def average_weights(w):
+def average_params(w):
     """
     Returns the average of the local weights.
     """
@@ -24,6 +24,21 @@ def average_weights(w):
             w_avg[key] += w[i][key]
         w_avg[key] = torch.div(w_avg[key], len(w))
     return w_avg
+
+def apply_server_update(args, model, deltas):
+    """
+    Returns mddel update by applying deltas and server lr
+    """
+    # set grads to deltas in the global model
+    for name, param in model.named_parameters():
+        if param.requires_grad:
+            param.grad = deltas[name]
+
+    optimizer = torch.optim.SGD(model.parameters(), lr=args.global_lr, weight_decay=1e-5)
+    optimizer.step()
+    optimizer.zero_grad(set_to_none=True)
+
+    return model.state_dict()
 
 def apply_adam_server_update(args, model, deltas):
     # set grads to deltas in the global model
