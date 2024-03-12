@@ -38,7 +38,7 @@ class FedAvgClient(object):
         """
         updates base for unperturbed model weights for the current gradient step for zo and sets initial weights for regular training
         """
-        self.base_model = copy.deepcopy(model.to('cpu')).state_dict()
+        self.base_model = copy.deepcopy(model).state_dict()
 
     def get_deltas(self, model):
         """
@@ -47,7 +47,7 @@ class FedAvgClient(object):
             model: the updated model obtained post training
         Returns: delta values for all model parmaeters where RequiresGrad=True in a dict
         """
-        m = model.state_dict()
+        m = model.to('cpu').state_dict()
         base_m = self.base_model
 
         for key in m.keys():
