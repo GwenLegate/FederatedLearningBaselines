@@ -59,6 +59,10 @@ def args_parser():
     parser.add_argument('--alpha', type=float, default=0.1, help="alpha of dirichlet, value between 0 and infinity\
                         more homogeneous when higher, more heterogeneous when lower")
     parser.add_argument('--print_every', type=int, default=20)
+    parser.add_argument('--eval_over_last_hundred', type=int, default=0, help= 'take final eval as average over last '
+                                                                               'hundred rounds of training. Useful for '
+                                                                               'particularly noisy training.'
+                                                                               ' Default is 0, i.e. false')
     parser.add_argument('--device', type=str, default='cuda')
     
     args = parser.parse_args()

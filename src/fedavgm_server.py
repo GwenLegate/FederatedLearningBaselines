@@ -7,7 +7,7 @@ import numpy as np
 import wandb
 import torch
 from src.fedavgm_client import FedAvgMClient
-from src.utils import average_weights, get_model, load_past_model, run_summary, wandb_setup, zero_last_hundred
+from src.utils import average_params, get_model, load_past_model, run_summary, wandb_setup, zero_last_hundred
 from src.eval_utils import validation_inference, test_inference, get_validation_ds
 from src.client_utils import get_client_labels
 from src.data_utils import get_dataset, split_dataset
@@ -23,8 +23,9 @@ class FedAvgMServer(object):
         if not os.path.isdir(run_dir):
             os.makedirs(run_dir, mode=0o755, exist_ok=True)
 
-        # set lists for last 100 item average
-        last_hundred_test_loss, last_hundred_test_acc, last_hundred_val_loss, last_hundred_val_acc = zero_last_hundred()
+        if self.args.eval_over_last_hundred:
+            last_hundred_test_loss, last_hundred_test_acc, last_hundred_val_loss, last_hundred_val_acc = zero_last_hundred()
+
         # load dataset
         train_dataset, validation_dataset, test_dataset = get_dataset(self.args)
         # splits dataset among clients
@@ -86,7 +87,7 @@ class FedAvgMServer(object):
             train_loss.append(loss_avg)
 
             # update global weights using the average of the obtained local deltas
-            global_delta = average_weights(local_deltas)
+            global_delta = average_params(local_deltas)
             server_momentum, global_weights = self._update_with_momentum(copy.deepcopy(server_momentum), copy.deepcopy(global_weights),
                                                                          copy.deepcopy(global_delta))
             global_model.load_state_dict(global_weights)
@@ -104,7 +105,7 @@ class FedAvgMServer(object):
                 torch.save(global_model.state_dict(), model_path)
                 torch.save(server_momentum, momentum_path)
 
-            if self.args.epochs - (epoch + 1) <= 100:
+            if self.args.eval_over_last_hundred and self.args.epochs - (epoch + 1) <= 100:
                 last_hundred_val_loss.append(val_loss)
                 last_hundred_val_acc.append(val_acc)
                 test_acc, test_loss = test_inference(self.args, global_model, test_dataset, self.args.num_workers)
@@ -117,13 +118,10 @@ class FedAvgMServer(object):
                     wandb.log({f'val_acc': val_acc,
                                f'val_loss': val_loss,
                                f'train_loss': loss_avg
-                               # f'global model test accuarcy': test_acc,
-                               # f'global model test loss': test_loss
                                }, step=epoch)
 
             epoch += 1
 
-        # model_path = f'/scratch/{os.environ.get("USER", "glegate")}/{self.args.wandb_run_name}/global_model.pt'
         model_path = f'{run_dir}/global_model.pt'
         # load best model for testing
         global_model.load_state_dict(torch.load(model_path))
@@ -131,24 +129,30 @@ class FedAvgMServer(object):
         # Test inference after completion of training
         test_acc, test_loss = test_inference(self.args, global_model, test_dataset, self.args.num_workers)
 
-        # last 100 avg acc and loss
-        last_hundred_test_loss = sum(last_hundred_test_loss) / len(last_hundred_test_loss)
-        last_hundred_test_acc = sum(last_hundred_test_acc) / len(last_hundred_test_acc)
-        last_hundred_val_loss = sum(last_hundred_val_loss) / len(last_hundred_val_loss)
-        last_hundred_val_acc = sum(last_hundred_val_acc) / len(last_hundred_val_acc)
+        if self.args.eval_over_last_hundred:
+            last_hundred_test_loss = sum(last_hundred_test_loss) / len(last_hundred_test_loss)
+            last_hundred_test_acc = sum(last_hundred_test_acc) / len(last_hundred_test_acc)
+            last_hundred_val_loss = sum(last_hundred_val_loss) / len(last_hundred_val_loss)
+            last_hundred_val_acc = sum(last_hundred_val_acc) / len(last_hundred_val_acc)
 
-        if self.args.wandb:
-            wandb.log({'val_acc': val_acc,
+            if self.args.wandb:
+                wandb.log({'val_acc': val_acc,
                        'test_acc': test_acc,
                        'last_100_val_acc': last_hundred_val_acc,
                        'last_100_test_acc': last_hundred_test_acc
                        })
 
-        return val_acc, val_loss, test_acc, test_loss, last_hundred_val_acc, last_hundred_val_loss, \
+            return val_acc, val_loss, test_acc, test_loss, last_hundred_val_acc, last_hundred_val_loss, \
                last_hundred_test_acc, last_hundred_test_loss
+        else:
+            if self.args.wandb:
+                wandb.log({'val_acc': val_acc,
+                       'test_acc': test_acc
+                       })
+
+            return val_acc, val_loss, test_acc, test_loss
 
     def _update_with_momentum(self, momentum, global_weights, global_deltas):
-        # updates using deltas instead of weights
         momentum_update = copy.deepcopy(momentum)
 
         for k, v in global_weights.items():
@@ -156,6 +160,5 @@ class FedAvgMServer(object):
                 pass
             else:
                 momentum_update[k] = (self.args.momentum * momentum[k]) + global_deltas[k]
-                a = self.args.global_lr * momentum_update[k]
                 global_weights[k] -= self.args.global_lr * momentum_update[k]
         return momentum_update, global_weights
