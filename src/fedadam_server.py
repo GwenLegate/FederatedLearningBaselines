@@ -23,7 +23,7 @@ class FedAdamServer(object):
         if not os.path.isdir(run_dir):
             os.makedirs(run_dir, mode=0o755, exist_ok=True)
 
-        if self.args.eval_over_last_hunderd:
+        if self.args.eval_over_last_hundred:
             last_hundred_test_loss, last_hundred_test_acc, last_hundred_val_loss, last_hundred_val_acc = zero_last_hundred()
 
         # load dataset
