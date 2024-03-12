@@ -168,7 +168,7 @@ class FedAvgClient(object):
                         break
             epoch_loss.append(sum(batch_loss)/len(batch_loss))
 
-        deltas = self.get_deltas()
+        deltas = self.get_deltas(model)
         model.to('cpu')
         return deltas, sum(epoch_loss) / len(epoch_loss), optional_eval_results
 
