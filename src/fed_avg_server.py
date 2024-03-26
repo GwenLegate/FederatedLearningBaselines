@@ -6,6 +6,9 @@ import copy
 import numpy as np
 import wandb
 import torch
+import multiprocessing as mp
+import torch.distributed as dist
+import torch.backends.cudnn as cudnn
 from src.fed_avg_client import FedAvgClient
 from src.utils import average_params, apply_server_update, get_model, load_past_model, run_summary, wandb_setup, zero_last_hundred
 from src.eval_utils import validation_inference, test_inference, get_validation_ds
@@ -18,6 +21,7 @@ class FedAvgServer(object):
 
     def start_server(self):
         # create dir to save run artifacts
+        # run_dir = f'/network/scratch/g/{os.environ.get("USER", "gwendolyne.legate")}/{self.args.wandb_run_name}'
         #run_dir = f'/scratch/{os.environ.get("USER", "glegate")}/{self.args.wandb_run_name}'
         run_dir = './run_data/'
         if not os.path.isdir(run_dir):

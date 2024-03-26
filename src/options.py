@@ -6,6 +6,7 @@ import argparse
 
 def args_parser():
     parser = argparse.ArgumentParser()
+    # wandb args
     parser.add_argument('--wandb', type=bool, default=False, help='enables wandb logging and disables local logfiles')
     parser.add_argument("--wandb_project", type=str, default='', help='specifies wandb project to log to')
     parser.add_argument("--wandb_entity", type=str, default='',
@@ -13,6 +14,19 @@ def args_parser():
     parser.add_argument("--wandb_run_name", type=str,
                         help="set run name to differentiate runs, if you don't set this wandb will auto generate one")
     parser.add_argument("--offline", type=bool, default=False, help="set wandb to run in offline mode")
+
+    # parallel training args
+    parser.add_argument("--parallel", default=0, type=int, help="use parallel training")
+    parser.add_argument("--clients_per_gpu", default=1, type=int, help="Clients to to train per GPU.")
+    parser.add_argument('--world_size', default=1, type=int, help='number of nodes for distributed training')
+    parser.add_argument('--rank', default=1, type=int, help='node rank for distributed training')
+    parser.add_argument('--lcl_rank', default=-1, type=int, help='local node rank for distributed training')
+    parser.add_argument("--gpu_list", default='0', type=str, help="list of gpus i.e. 0,1,2,3,...")
+    parser.add_argument('--port', type=int, help='port to run main process')
+    parser.add_argument('--dist_url', type=str, default='', help='address to make main process reachable from all processes')
+    parser.add_argument('--dist_backend', type=str, default='nccl', help='distributed backend')
+
+    # training args
     parser.add_argument('--num_workers', type=int, default=1, help="how many subprocesses to use for data loading.")
     parser.add_argument('--epochs', type=int, default=4000, help="number of rounds of training")
     parser.add_argument("--fed_type", type=str, default='fedavg',
@@ -45,6 +59,7 @@ def args_parser():
     parser.add_argument('--continue_train', type=str, default='', help="path to model to load to continue training")
     parser.add_argument('--hyperparam_search', type=bool, default=False,
                         help="sets random values within a specified range for a hyper parameter search")
+    # dataset args
     parser.add_argument('--dataset', type=str, default='cifar10',
                         help="name of dataset. mnist, fmnist, cifar10, cifar100")
     parser.add_argument('--frac_client_samples', type=float, default=None,
@@ -63,7 +78,7 @@ def args_parser():
                                                                                'hundred rounds of training. Useful for '
                                                                                'particularly noisy training.'
                                                                                ' Default is 0, i.e. false')
-    parser.add_argument('--device', type=str, default='cuda')
+    parser.add_argument('--device', type=str, default='cuda:0')
     
     args = parser.parse_args()
     return args

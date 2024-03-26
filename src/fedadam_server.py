@@ -18,6 +18,7 @@ class FedAdamServer(object):
 
     def start_server(self):
         # create dir to save run artifacts
+        # run_dir = f'/network/scratch/g/{os.environ.get("USER", "gwendolyne.legate")}/{self.args.wandb_run_name}'
         #run_dir = f'/scratch/{os.environ.get("USER", "glegate")}/{self.args.wandb_run_name}'
         run_dir = './run_data/'
         if not os.path.isdir(run_dir):
