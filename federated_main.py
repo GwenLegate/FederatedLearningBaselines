@@ -5,7 +5,7 @@ import time
 from src.options import args_parser, validate_args
 from src.utils import set_random_args
 from src.data_utils import dataset_config
-from src.fed_avg_server import FedAvgServer
+from src.fedavg_server import FedAvgServer
 from src.fedavgm_server import FedAvgMServer
 from src.fedadam_server import FedAdamServer
 

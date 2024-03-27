@@ -3,7 +3,7 @@ import torch
 from torch.utils.data import DataLoader
 from src.data_utils import get_dataset
 from src.models import ResNet18, ResNet34
-from src.fed_avg_client import DatasetSplit
+from src.fedavg_client import DatasetSplit
 
 def get_validation_ds(num_clients, user_groups, validation_dataset):
     # combine indicies for validation sets of each client to test global model on complete set
