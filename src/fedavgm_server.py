@@ -7,7 +7,8 @@ import numpy as np
 import wandb
 import torch
 from src.fedavgm_client import FedAvgMClient
-from src.utils import average_params, get_model, load_past_model, run_summary, wandb_setup, zero_last_hundred, last_hundred_update, last_hundred_avg, init_run_dir
+from src.utils import (average_params, get_model, load_past_model, run_summary, wandb_setup, zero_last_hundred,
+                       last_hundred_update, last_hundred_avg, init_run_dir)
 from src.eval_utils import validation_inference, test_inference, get_validation_ds
 from src.client_utils import get_client_labels
 from src.data_utils import get_dataset, split_dataset
