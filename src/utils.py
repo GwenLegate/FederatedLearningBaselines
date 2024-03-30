@@ -4,15 +4,38 @@
 
 import copy
 from time import time
-import multiprocessing as mp
 import random
 import wandb
 import torch
 from torch.utils.data import DataLoader
-from torch.optim import Adam
 import os
 import numpy as np
+import multiprocessing as mp
 from src.models import ResNet34, ResNet18, ResNet50, ResNet101, ResNet152
+
+def init_run_dir(args, my_env=None):
+    """
+    Creates a directory to store run artifacts and throws an error if the directory already exists.
+    Args:
+        args: command line args
+        my_env: specifies compute environment so directory is made in the correct location (Mila, Compute Canada or local)
+    Returns:
+        the path to the run directory
+    """
+    if my_env == 'Mila':
+        run_dir = f'/network/scratch/g/{os.environ.get("USER", "gwendolyne.legate")}/{args.wandb_run_name}'
+    elif my_env == 'CC':
+        run_dir = f'/scratch/{os.environ.get("USER", "glegate")}/{args.wandb_run_name}'
+    else:
+        run_dir = './run_data/'
+
+    if not os.path.isdir(run_dir):
+        os.makedirs(run_dir, mode=0o755, exist_ok=True)
+    else:
+        raise Exception(f'Directory {args.wandb_run_name} already exists')
+
+    return run_dir
+
 
 def average_params(w):
     """
@@ -24,33 +47,6 @@ def average_params(w):
             w_avg[key] += w[i][key]
         w_avg[key] = torch.div(w_avg[key], len(w))
     return w_avg
-
-def apply_server_update(args, model, deltas):
-    """
-    Returns mddel update by applying deltas and server lr
-    """
-    # set grads to deltas in the global model
-    for name, param in model.named_parameters():
-        if param.requires_grad:
-            param.grad = deltas[name]
-
-    optimizer = torch.optim.SGD(model.parameters(), lr=args.global_lr, weight_decay=1e-5)
-    optimizer.step()
-    optimizer.zero_grad(set_to_none=True)
-
-    return model.state_dict()
-
-def apply_adam_server_update(args, model, deltas):
-    # set grads to deltas in the global model
-    for name, param in model.named_parameters():
-        if param.requires_grad:
-            param.grad = deltas[name]
-
-    optimizer = Adam(model.parameters(), lr=args.global_lr, betas=(args.beta1, args.beta2), weight_decay=1e-5, eps=args.adam_eps)
-    optimizer.step(closure=None)
-    optimizer.zero_grad(set_to_none=True)
-
-    return model.state_dict()
 
 def average_grads(local_grads):
     grad_avg = copy.deepcopy(local_grads[0])
@@ -64,62 +60,6 @@ def average_grads(local_grads):
             grad_avg[k] *= int(1 / len(local_grads))
 
     return grad_avg
-
-def update_with_momentum(args, momentum, w_delta, global_weights):
-    # option for sgd with weight decay and nesterov accelerate gradient as outlined in FedAvgM paper by Hsu et al.
-    # TODO: fix, not working
-    '''optimizer = torch.optim.SGD(global_model.parameters(), lr=args.global_lr, weight_decay=0.004, momentum=args.momentum, nesterov=True)
-    #optimizer = torch.optim.SGD(global_model.parameters(), args.momentum)
-    global_model.zero_grad()
-    # manually set grads
-    grad_idx = 0
-    with torch.no_grad():
-        for param in global_model.parameters():
-            param.grad = grad_avg[tensor_keys[grad_idx]]
-            grad_idx += 1
-    optimizer.step()'''
-
-    momentum = copy.deepcopy(momentum)
-    w_delta = copy.deepcopy(w_delta)
-    global_weights = copy.deepcopy(global_weights)
-    new_momentum = copy.deepcopy(momentum)
-    for k, v in global_weights.items():
-        new_momentum[k] = (args.momentum * momentum[k]) + w_delta[k]
-        global_weights[k] = global_weights[k] - args.global_lr * new_momentum[k]
-        #global_weights[k] = global_weights[k] - (args.momentum * momentum[k]) - w_delta[k] #equivalent
-    return new_momentum, global_weights
-
-def update_momentum(args, momentum, prev_global_weights, global_weights):
-    # option for sgd with weight decay and nesterov accelerate gradient as outlined in FedAvgM paper by Hsu et al.
-    # TODO: fix, not working
-    '''optimizer = torch.optim.SGD(global_model.parameters(), lr=args.global_lr, weight_decay=0.004, momentum=args.momentum, nesterov=True)
-    #optimizer = torch.optim.SGD(global_model.parameters(), args.momentum)
-    global_model.zero_grad()
-    # manually set grads
-    grad_idx = 0
-    with torch.no_grad():
-        for param in global_model.parameters():
-            param.grad = grad_avg[tensor_keys[grad_idx]]
-            grad_idx += 1
-    optimizer.step()'''
-
-    momentum = copy.deepcopy(momentum)
-    momentum_update = copy.deepcopy(momentum)
-    global_weights = copy.deepcopy(global_weights)
-    prev_global_weights = copy.deepcopy(prev_global_weights)
-
-    # calculate weight delta
-    global_w_delta = get_delta(prev_global_weights, global_weights)
-
-    # update momentum
-    for k, v in global_weights.items():
-        momentum_update[k] = (args.momentum * momentum[k]) + global_w_delta[k]
-
-    # add momentum to global update. current global weights are (w - delta_w)
-    # momentum update is (w - beta*momentum - delta_w) --> (global_weight -beta*new_momentum)
-        global_weights[k] = global_weights[k] - args.global_lr * momentum_update[k]
-
-    return momentum_update, global_weights
 
    # set random values for learning rates, local epochs, local batch size for hyperparameter search
 def set_random_args(args):
@@ -250,7 +190,24 @@ def get_delta(params1, params2):
     return params2
 
 def zero_last_hundred():
-    return [], [], [], []
+    return ([], [], [], [])
+
+def last_hundred_update(last_humdred, acc_and_loss):
+    for arr, val in zip(last_humdred, acc_and_loss):
+        arr.append(val)
+    return last_humdred
+
+def last_hundred_avg(args, last_hundred, val_acc, test_acc):
+    avgs = []
+    for arr in last_hundred:
+        avgs.append(sum(arr)/len(arr))
+    if args.wandb:
+        wandb.log({'val_acc': val_acc,
+                   'test_acc': test_acc,
+                   'last_100_val_acc': avgs[1],
+                   'last_100_test_acc': avgs[3]
+                   })
+    return avgs[0], avgs[1], avgs[2], avgs[3]
 
 def compute_accuracy(model, dataloader, device):
     """
