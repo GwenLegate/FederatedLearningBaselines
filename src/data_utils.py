@@ -118,8 +118,6 @@ def get_dataset(args):
         test_dataset = Imagenet32(
             f'{data_dir}out_data_val/',
             transform=transforms.Compose([
-                transforms.RandomCrop(32, padding=4),
-                transforms.RandomHorizontalFlip(),
                 transforms.ToTensor(),
                 normalize,
             ]))
