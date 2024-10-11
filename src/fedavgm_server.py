@@ -6,6 +6,7 @@ import copy
 import numpy as np
 import wandb
 import torch
+from torch.optim import SGD
 from src.fedavgm_client import FedAvgMClient
 from src.utils import (average_params, get_model, load_past_model, run_summary, wandb_setup, zero_last_hundred,
                        last_hundred_update, last_hundred_avg, init_run_dir)
@@ -25,10 +26,13 @@ class FedAvgMServer(object):
         if self.args.eval_over_last_hundred:
             last_hundred = zero_last_hundred()
 
-        # load dataset and init model and momentum
+        # load dataset and init model and optimizer
         train_dataset, validation_dataset, test_dataset = get_dataset(self.args)
         global_model = get_model(self.args)
         global_weights = global_model.state_dict()
+        optimizer = SGD(global_model.parameters(), self.args.global_lr, self.args.momentum)
+
+        #TODO: remove ref to manual momentum updates
         server_momentum = copy.deepcopy(global_weights)
         for k, v in server_momentum.items():
             server_momentum[k] = torch.zeros_like(v)
@@ -79,10 +83,7 @@ class FedAvgMServer(object):
 
             # update global weights
             global_deltas = average_params(local_deltas)
-            server_momentum, global_weights = self._apply_momentum_server_update(copy.deepcopy(server_momentum),
-                                                                                 copy.deepcopy(global_weights),
-                                                                                 copy.deepcopy(global_deltas))
-            global_model.load_state_dict(global_weights)
+            self._apply_momentum_server_update(global_model, optimizer, copy.deepcopy(global_deltas))
 
             # Test global model inference on validation set after each round use model save criteria
             val_acc, val_loss = validation_inference(self.args, global_model, validation_dataset_global, self.args.num_workers)
@@ -130,7 +131,7 @@ class FedAvgMServer(object):
 
             return val_acc, val_loss, test_acc, test_loss
 
-    def _apply_momentum_server_update(self, momentum, global_weights, global_deltas):
+    def _apply_momentum_server_update1(self, momentum, global_weights, global_deltas):
         momentum_update = copy.deepcopy(momentum)
 
         for k, v in global_weights.items():
@@ -140,3 +141,18 @@ class FedAvgMServer(object):
                 momentum_update[k] = (self.args.momentum * momentum[k]) + global_deltas[k]
                 global_weights[k] -= self.args.global_lr * momentum_update[k]
         return momentum_update, global_weights
+
+    def _apply_momentum_server_update(self, model, optimizer, deltas):
+        model_weights = copy.deepcopy(model.state_dict())
+        # update batch statistics if necessary
+        for key in model_weights.keys():
+            if 'running' in key or 'batches' in key:
+                model_weights[key] = deltas[key]
+        model.load_state_dict(model_weights)
+
+        # update gradients with deltas for the round
+        for name, param in model.named_parameters():
+            if param.requires_grad:
+                param.grad = deltas[name]
+        optimizer.step()
+        optimizer.zero_grad(set_to_none=True)

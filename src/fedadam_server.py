@@ -25,9 +25,11 @@ class FedAdamServer(object):
         if self.args.eval_over_last_hundred:
             last_hundred = zero_last_hundred()
 
-        # load dataset and model
+        # load dataset and model and optimizer
         train_dataset, validation_dataset, test_dataset = get_dataset(self.args)
         global_model = get_model(self.args)
+        optimizer = Adam(global_model.parameters(), lr=self.args.global_lr, betas=(self.args.beta1, self.args.beta2), weight_decay=1e-5, eps=self.args.adam_eps)
+
         if len(self.args.continue_train) > 0:
             global_model, user_groups = load_past_model(self.args, global_model)
         else:
@@ -74,8 +76,7 @@ class FedAdamServer(object):
 
             # update global weights
             global_deltas = average_params(local_deltas)
-            global_weights = self._apply_adam_server_update(copy.deepcopy(global_model), copy.deepcopy(global_deltas))
-            global_model.load_state_dict(global_weights)
+            self._apply_adam_server_update(global_model, optimizer, copy.deepcopy(global_deltas))
 
             # Test global model inference on validation set after each round use model save criteria
             val_acc, val_loss = validation_inference(self.args, global_model, validation_dataset_global, self.args.num_workers)
@@ -121,17 +122,21 @@ class FedAdamServer(object):
 
             return val_acc, val_loss, test_acc, test_loss
 
-    def _apply_adam_server_update(self, model, deltas):
-        # set grads to deltas in the global model
+    def _apply_adam_server_update(self, model, optimizer, deltas):
+        model_weights = copy.deepcopy(model.state_dict())
+        # update batch statistics if necessary
+        for key in model_weights.keys():
+            if 'running' in key or 'batches' in key:
+                model_weights[key] = deltas[key]
+        model.load_state_dict(model_weights)
+
+        # update gradients with deltas for the round
         for name, param in model.named_parameters():
             if param.requires_grad:
                 param.grad = deltas[name]
 
-        optimizer = Adam(model.parameters(), lr=self.args.global_lr, betas=(self.args.beta1, self.args.beta2), weight_decay=1e-5, eps=self.args.adam_eps)
         optimizer.step(closure=None)
         optimizer.zero_grad(set_to_none=True)
-
-        return model.state_dict()
 
 
 

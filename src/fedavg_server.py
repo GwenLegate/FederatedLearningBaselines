@@ -125,10 +125,14 @@ class FedAvgServer(object):
         """
         Returns model update by applying deltas and server lr
         """
-        # set grads to deltas in the global model
-        for name, param in model.named_parameters():
-            if param.requires_grad:
-                param.grad = deltas[name]
+        model_weights = model.state_dict()
+        # update weights and load into model
+        for key in model_weights.keys():
+            if 'running' not in key and 'batches' not in key:
+                model_weights[key] -= self.args.global_lr * deltas[key]
+            else:
+                model_weights[key] = deltas[key]
+        model.load_state_dict(model_weights)
 
         optimizer = torch.optim.SGD(model.parameters(), lr=self.args.global_lr, weight_decay=1e-5)
         optimizer.step()
