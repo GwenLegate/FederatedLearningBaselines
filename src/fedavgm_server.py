@@ -29,16 +29,10 @@ class FedAvgMServer(object):
         # load dataset and init model and optimizer
         train_dataset, validation_dataset, test_dataset = get_dataset(self.args)
         global_model = get_model(self.args)
-        global_weights = global_model.state_dict()
         optimizer = SGD(global_model.parameters(), self.args.global_lr, self.args.momentum)
 
-        #TODO: remove ref to manual momentum updates
-        server_momentum = copy.deepcopy(global_weights)
-        for k, v in server_momentum.items():
-            server_momentum[k] = torch.zeros_like(v)
-
         if len(self.args.continue_train) > 0:
-            global_model, user_groups, momentum = load_past_model(self.args, global_model, server_momentum)
+            global_model, user_groups = load_past_model(self.args, global_model)
         else:
             user_groups = split_dataset(train_dataset, self.args)
             user_groups_to_save = f'{self.run_dir}/user_groups.pt'
@@ -94,9 +88,7 @@ class FedAvgMServer(object):
                 # save model, momentum update if it is best acc
                 best_acc = copy.deepcopy(val_acc)
                 model_path = f'{self.run_dir}/global_model.pt'
-                momentum_path = f'{self.run_dir}/server_momentum.pt'
                 torch.save(global_model.state_dict(), model_path)
-                torch.save(server_momentum, momentum_path)
 
             if self.args.eval_over_last_hundred and self.args.epochs - (self.epoch + 1) <= 100:
                 test_acc, test_loss = test_inference(self.args, global_model, test_dataset, self.args.num_workers)
@@ -130,17 +122,6 @@ class FedAvgMServer(object):
                            })
 
             return val_acc, val_loss, test_acc, test_loss
-
-    def _apply_momentum_server_update1(self, momentum, global_weights, global_deltas):
-        momentum_update = copy.deepcopy(momentum)
-
-        for k, v in global_weights.items():
-            if "running" in k or "batches_tracked" in k:
-                pass
-            else:
-                momentum_update[k] = (self.args.momentum * momentum[k]) + global_deltas[k]
-                global_weights[k] -= self.args.global_lr * momentum_update[k]
-        return momentum_update, global_weights
 
     def _apply_momentum_server_update(self, model, optimizer, deltas):
         model_weights = copy.deepcopy(model.state_dict())
