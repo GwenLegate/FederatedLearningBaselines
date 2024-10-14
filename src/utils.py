@@ -32,7 +32,8 @@ def init_run_dir(args, my_env=None):
     if not os.path.isdir(run_dir):
         os.makedirs(run_dir, mode=0o755, exist_ok=True)
     else:
-        raise Exception(f'Directory {args.wandb_run_name} already exists')
+        if args.wandb_run_name is not None:
+            raise Exception(f'Directory {args.wandb_run_name} already exists')
 
     return run_dir
 

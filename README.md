@@ -11,19 +11,22 @@ Baselines are selected using the `--fed_type` option. The default is FedAvg
 
 ### Hyper-parameters and Results
 
-Experiemnts were conducted matching as closely as possible to the federated hyper-parameters provided in
-[Adaptive Federated Optimization](https://arxiv.org/pdf/2003.00295.pdf) using the Cifar-10 dataset.
+Experiemntal conditions match the federated hyper-parameters provided in [Adaptive Federated Optimization](https://arxiv.org/pdf/2003.00295.pdf) for the 
+Cifar-10 dataset. Learning rates were tuned by a grid search and each reported accuracy was obtained over four seeds.
 * 4000 global rounds
 * 500 training samples per client
 * 1 local epoch
 * batch size of 20
+* Group normalization as per [Hsieh et. al.](http://proceedings.mlr.press/v119/hsieh20a.html).
 
-|Baseline  |Accuracy (avg) +/- std  |Run Command to Obtain Results in Prev Column |
-|----------|------------------------|---------------------------------------------|
-| FedAvg   |73.8 +/- 1.3            |`federated_main.py --epochs=4000 --client_lr=0.0316 --num_clients=450 --frac=0.023 --local_ep=1 --local_bs=20 --num_workers=16`                                           |
-| FedAvgM  |84.1 (only 1 sample)    |`federated_main.py --fed_type=fedavgm --epochs=4000 --client_lr=0.003 --num_clients=450 --frac=0.023 --momentum=0.9 --local_ep=1 --local_bs=20 --num_workers=8`                                             |
-| FedADAM  |78.0 +/- 2.2            | `federated_main.py --epochs=4000 --fed_type=fedadam --global_lr=0.0316 --beta1=0.9 --beta2=0.999 --adam_eps=0.01 --client_lr=0.01 --num_clients=450 --frac=0.023 --local_ep=1 --local_bs=20 --num_workers=16`                                            |
+Note: While the code has the option to use batch norm as well, training using batch norm and FedAvgM was found to be unstable and does not converge.
 
+|Baseline  | Accuracy avg +/- std | Run Command to Obtain Results in Prev Column                                                                                                                                                                 |
+|----------|----------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| FedAvg   | 72.8 +/- 0.5         | `federated_main.py --epochs=4000 --client_lr=0.03 --num_clients=450 --frac=0.023 --local_ep=1 --local_bs=20 --num_workers=2`                                                                                 |
+| FedAvgM  | 83.5 +/- 0.7         | `federated_main.py --fed_type=fedavgm --epochs=4000 --client_lr=0.003 --num_clients=450 --frac=0.023 --momentum=0.9 --local_ep=1 --local_bs=20 --num_workers=2`                                              |
+| FedADAM  | 85.0 +/- 0.6         | `federated_main.py --epochs=4000 --fed_type=fedadam --global_lr=0.0001 --beta1=0.9 --beta2=0.999 --adam_eps=1e-8 --client_lr=0.01 --num_clients=450 --frac=0.023 --local_ep=1 --local_bs=20 --num_workers=2` | 
+Note: group norm was used as per 
 sample training curves and their final accuracies for each of the three baselines currently implemented
 ![alt text](https://github.com/GwenLegate/FederatedLearningBaselines/blob/master/figs/curves.png?raw=true)
 
