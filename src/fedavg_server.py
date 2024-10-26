@@ -137,7 +137,7 @@ class FedAvgServer(object):
             if param.requires_grad:
                 param.grad = deltas[name]
 
-        optimizer = torch.optim.SGD(model.parameters(), lr=self.args.global_lr, weight_decay=1e-5)
+        optimizer = torch.optim.SGD(model.parameters(), lr=self.args.server_lr, weight_decay=1e-5)
         optimizer.step()
         optimizer.zero_grad(set_to_none=True)
 
