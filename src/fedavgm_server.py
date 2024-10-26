@@ -29,7 +29,7 @@ class FedAvgMServer(object):
         # load dataset and init model and optimizer
         train_dataset, validation_dataset, test_dataset = get_dataset(self.args)
         global_model = get_model(self.args)
-        optimizer = SGD(global_model.parameters(), self.args.global_lr, self.args.momentum)
+        optimizer = SGD(global_model.parameters(), self.args.server_lr, self.args.momentum)
 
         if len(self.args.continue_train) > 0:
             global_model, user_groups = load_past_model(self.args, global_model)

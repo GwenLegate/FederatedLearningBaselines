@@ -119,6 +119,8 @@ class FedAdamClient(object):
                 model.zero_grad()
 
                 logits = model(images)
+                if self.args.model == 'vit':
+                    logits = logits[0]
                 loss = self.criterion(logits, labels)
 
                 if self.args.accu_split is not None:

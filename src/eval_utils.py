@@ -2,7 +2,7 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 from src.data_utils import get_dataset
-from src.models import ResNet18, ResNet34
+from src.resnets import ResNet18, ResNet34
 from src.fedavg_client import DatasetSplit
 
 def get_validation_ds(num_clients, user_groups, validation_dataset):
@@ -29,10 +29,9 @@ def validation_inference(args, model, validation_dataset, num_workers):
         images, labels = images.to(args.device), labels.to(args.device)
 
         # Inference
-        try:
-            outputs = model(images)
-        except:
-            outputs = model(images)
+        outputs = model(images)
+        if args.model == 'vit':
+            outputs = outputs[0]
         batch_loss = criterion(outputs, labels)
         loss += batch_loss.item()
 
@@ -63,6 +62,8 @@ def test_inference(args, model, test_dataset, num_workers):
 
         # Inference
         outputs = model(images)
+        if args.model == 'vit':
+            outputs = outputs[0]
         batch_loss = criterion(outputs, labels)
         loss += batch_loss.item()
 

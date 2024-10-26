@@ -28,7 +28,7 @@ class FedAdamServer(object):
         # load dataset and model and optimizer
         train_dataset, validation_dataset, test_dataset = get_dataset(self.args)
         global_model = get_model(self.args)
-        optimizer = Adam(global_model.parameters(), lr=self.args.global_lr, betas=(self.args.beta1, self.args.beta2), weight_decay=1e-5, eps=self.args.adam_eps)
+        optimizer = Adam(global_model.parameters(), lr=self.args.server_lr, betas=(self.args.beta1, self.args.beta2), weight_decay=1e-5, eps=self.args.adam_eps)
 
         if len(self.args.continue_train) > 0:
             global_model, user_groups = load_past_model(self.args, global_model)

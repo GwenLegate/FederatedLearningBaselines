@@ -11,7 +11,8 @@ from torch.utils.data import DataLoader
 import os
 import numpy as np
 import multiprocessing as mp
-from src.models import ResNet34, ResNet18, ResNet50, ResNet101, ResNet152
+from src.resnets import ResNet34, ResNet18, ResNet50, ResNet101, ResNet152
+from src.vit import ViTForClassification
 
 def init_run_dir(args, my_env=None):
     """
@@ -66,7 +67,7 @@ def average_grads(local_grads):
 def set_random_args(args):
     lrs = [7E-2, 5E-2, 3E-2, 1E-2, 7E-3, 5E-3, 3E-3, 1E-3, 7E-4]
     args.local_bs = random.randrange(5, 120, 5)  # sets a local batch size between 5 and 125 (intervals of 5)
-    args.global_lr = 1
+    args.server_lr = 1
     idx = random.randrange(9)
     args.client_lr = lrs[idx]
     args.local_ep = random.randrange(4, 26)
@@ -162,6 +163,8 @@ def get_model(args):
         return ResNet101(args=args)
     elif args.model == 'resnet152':
         return ResNet152(args=args)
+    elif args.model == 'vit':
+        return ViTForClassification(args)
     else:
         exit('Error: unrecognized model')
 
