@@ -2,7 +2,7 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 from src.data_utils import get_dataset
-from src.resnets import ResNet18, ResNet34
+from src.resnets import ResNet18
 from src.fedavg_client import DatasetSplit
 
 def get_validation_ds(num_clients, user_groups, validation_dataset):

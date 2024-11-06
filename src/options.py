@@ -66,9 +66,9 @@ def args_parser():
     parser.add_argument("--use_faster_attention", type=bool, default=True)
 
     # dataset args
-    parser.add_argument("--image_size", type=int, default=32, help='image dimansions')
+    parser.add_argument("--image_size", type=int, default=32, help='image dimensions')
     parser.add_argument('--dataset', type=str, default='cifar10',
-                        help="name of dataset. mnist, fmnist, cifar10, cifar100")
+                        help="name of dataset. mnist, fmnist, cifar10, cifar100, flowers102")
     parser.add_argument('--frac_client_samples', type=float, default=None,
                         help="select a fraction [0, 1] of dataset samples to train on")
     parser.add_argument('--num_classes', type=int, default=10, help="number of classes")

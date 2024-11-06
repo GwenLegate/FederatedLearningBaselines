@@ -101,7 +101,7 @@ def noniid_dirichlet_equal_split(dataset, alpha, num_clients, num_classes, data_
     try:
         labels = np.array(dataset.targets)
     except AttributeError:
-        labels = np.array(dataset.labels)
+        labels = np.array(dataset._labels)
     dict_users = {}
     multinomial_vals = []
     examples_per_label = []

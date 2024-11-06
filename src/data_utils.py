@@ -5,6 +5,7 @@ from torchvision import datasets, transforms
 from src.sampling import iid_split, noniid_fedavg_split, noniid_dirichlet_equal_split
 import ssl
 
+
 def dataset_config(args):
     '''
     sets dependent args based on selected dataset if the required args are different from the default
@@ -20,6 +21,10 @@ def dataset_config(args):
         args.num_classes = 1000
     if args.dataset == 'mnist':
         args.num_channels = 1
+    if args.dataset == 'flowers102':
+        args.num_classes = 102
+        args.image_size = 224
+
 
 def get_num_samples_per_label(self, dataset_labels):
     labels = np.array(dataset_labels)
@@ -27,6 +32,7 @@ def get_num_samples_per_label(self, dataset_labels):
     for i in range(self.args.num_classes):
         examples_per_label.append(int(np.argwhere(labels == i).shape[0]))
     return examples_per_label
+
 
 def get_dataset(args):
     """
@@ -49,14 +55,20 @@ def get_dataset(args):
         ])
 
         if args.dataset == 'cifar10':
-            train_dataset = datasets.CIFAR10(f'{data_dir}{args.dataset}/', train=True, download=True, transform=transform_train)
-            validation_dataset = datasets.CIFAR10(f'{data_dir}{args.dataset}/', train=True, download=False, transform=transform_test)
-            test_dataset = datasets.CIFAR10(f'{data_dir}{args.dataset}/', train=False, download=False, transform=transform_test)
+            train_dataset = datasets.CIFAR10(f'{data_dir}{args.dataset}/', train=True, download=True,
+                                             transform=transform_train)
+            validation_dataset = datasets.CIFAR10(f'{data_dir}{args.dataset}/', train=True, download=False,
+                                                  transform=transform_test)
+            test_dataset = datasets.CIFAR10(f'{data_dir}{args.dataset}/', train=False, download=False,
+                                            transform=transform_test)
 
         if args.dataset == 'cifar100':
-            train_dataset = datasets.CIFAR100(f'{data_dir}{args.dataset}/', train=True, download=True, transform=transform_train)
-            validation_dataset = datasets.CIFAR100(f'{data_dir}{args.dataset}/', train=True, download=False, transform=transform_test)
-            test_dataset = datasets.CIFAR100(f'{data_dir}{args.dataset}/', train=False, download=False, transform=transform_test)
+            train_dataset = datasets.CIFAR100(f'{data_dir}{args.dataset}/', train=True, download=True,
+                                              transform=transform_train)
+            validation_dataset = datasets.CIFAR100(f'{data_dir}{args.dataset}/', train=True, download=False,
+                                                   transform=transform_test)
+            test_dataset = datasets.CIFAR100(f'{data_dir}{args.dataset}/', train=False, download=False,
+                                             transform=transform_test)
 
     elif args.dataset == 'femnist':
         data_dir = '../data/femnist/'
@@ -121,8 +133,27 @@ def get_dataset(args):
                 transforms.ToTensor(),
                 normalize,
             ]))
+    elif args.dataset == 'flowers102':
+        data_dir = '../data/flowers/'
+        train_transforms = transforms.Compose([transforms.Resize((224, 224)),
+                                               transforms.RandomHorizontalFlip(),
+                                               transforms.ToTensor(),
+                                               transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+                                               ])
+        test_transforms = transforms.Compose([transforms.Resize((224, 224)),
+                                              transforms.ToTensor(),
+                                              transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+                                              ])
+        train_dataset = datasets.Flowers102(f'{data_dir}train/', split='train', transform=train_transforms, download=True)
+        validation_dataset = datasets.Flowers102(f'{data_dir}train/', split='train', transform=test_transforms, download=True)
+        test_dataset = datasets.Flowers102(f'{data_dir}test/', split='test', transform=test_transforms, download=True)
+
+    else:
+        print(f'dataset {args.dataset} is invalid')
+        exit(1)
 
     return train_dataset, validation_dataset, test_dataset
+
 
 def split_dataset(train_dataset, args):
     ''' Splits the dataset between args.num_clients clients and further partitions each clients subset into training
