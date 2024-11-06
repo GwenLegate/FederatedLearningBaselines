@@ -55,10 +55,10 @@ def args_parser():
 
     # ViT args
     parser.add_argument("--patch_size", type=int, default=4)  # Input image size: 32x32 -> 8x8 patches
-    parser.add_argument("--hidden_size", type=int, default=768)
-    parser.add_argument("--intermediate_size", type=int, default=3072)  # 4 * hidden_size
-    parser.add_argument("--num_hidden_layers", type=int, default=12)
-    parser.add_argument("--num_attention_heads", type=int, default=12)
+    parser.add_argument("--hidden_size", type=int, default=512)
+    parser.add_argument("--intermediate_size", type=int, default=2048)  # 4 * hidden_size
+    parser.add_argument("--num_hidden_layers", type=int, default=6)
+    parser.add_argument("--num_attention_heads", type=int, default=8)
     parser.add_argument("--hidden_dropout_prob", type=float, default=0.)
     parser.add_argument("--attention_probs_dropout_prob", type=float, default=0.)
     parser.add_argument("--initializer_range", type=float, default=0.02)
