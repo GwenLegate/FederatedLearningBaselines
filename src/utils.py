@@ -102,6 +102,7 @@ def run_summary(args):
           f'\tdataset: {args.dataset}')
 
 def wandb_setup(args, model, run_dir, central=False):
+    wandb.init(settings=wandb.Settings(start_method='fork'))
     if args.wandb_run_name:
         os.environ['WANDB_NAME'] = args.wandb_run_name
         os.environ['WANDB_START_METHOD'] = "thread"
