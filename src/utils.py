@@ -102,7 +102,6 @@ def run_summary(args):
           f'\tdataset: {args.dataset}')
 
 def wandb_setup(args, model, run_dir, central=False):
-    wandb.init(settings=wandb.Settings(start_method='fork'))
     if args.wandb_run_name:
         os.environ['WANDB_NAME'] = args.wandb_run_name
         os.environ['WANDB_START_METHOD'] = "thread"
@@ -118,7 +117,6 @@ def wandb_setup(args, model, run_dir, central=False):
 
     # if using wandb check project and entity are set
     assert not args.wandb_project == '' and not args.wandb_entity == ''
-    wandb.login()
     wandb.init(dir=wandb_path, project=args.wandb_project, entity=args.wandb_entity)
     if central:
         general_args = {
