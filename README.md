@@ -7,7 +7,9 @@ Currently, available baselines are:
 * [FedAvgM](https://arxiv.org/pdf/1909.06335.pdf)
 * [FedADAM](https://arxiv.org/pdf/2003.00295.pdf)
 
-Baselines are selected using the `--fed_type` option. The default is FedAvg
+All baselines can be used in combination with [WSM](https://proceedings.mlr.press/v232/legate23a/legate23a.pdf) by setting `--wsm=1`
+
+Baselines are selected using the `--fed_type` option. The default is FedAvg.
 
 ### Hyper-parameters and Results
 

@@ -6,7 +6,7 @@ import torch
 import numpy as np
 from torch import nn
 from torch.utils.data import DataLoader
-from src.client_utils import DatasetSplit, train_test
+from src.client_utils import DatasetSplit, train_test, wsm
 import torch.nn.functional as F
 
 class Client(object):
@@ -111,7 +111,7 @@ class Client(object):
             logits = model(images)
 
             if self.args.wsm:
-                logits = self.weighted_log_softmax(logits)
+                logits = wsm(logits)
 
             loss = self.criterion(logits, labels)
             loss.backward()
@@ -147,6 +147,8 @@ class Client(object):
                 logits = model(images)
                 if self.args.model == 'vit':
                     logits = logits[0]
+                if self.args.wsm:
+                    logits = wsm(logits)
                 loss = self.criterion(logits, labels)
 
                 if self.args.accu_split is not None:

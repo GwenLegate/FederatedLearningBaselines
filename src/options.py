@@ -24,6 +24,7 @@ def args_parser():
     parser.add_argument('--epochs', type=int, default=4000, help="number of rounds of training")
     parser.add_argument("--fed_type", type=str, default='fedavg',
                         help="chose federated algorithm. fedavg, fedavgm, fedadam implemented (so far)")
+    parser.add_argument('--wsm', type=int, default=0, help="apply WSM if flag is 1 else train normally")
     parser.add_argument('--num_clients', type=int, default=100, help="number of clients: K")
     parser.add_argument('--frac', type=float, default=0.1, help='the fraction of clients: C')
     parser.add_argument('--local_ep', type=int, default=3, help="the number of local epochs: E")

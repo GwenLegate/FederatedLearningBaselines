@@ -18,6 +18,19 @@ class DatasetSplit(Dataset):
         image, label = self.dataset[self.idxs[item]]
         return torch.tensor(image), torch.tensor(label)
 
+def wsm(logits):
+    """
+    computes softmax weighted by class proportions from the client
+    Args:
+        logits: logits for the mini batch under consideration
+    Returns:
+        softmax weighted by class proportion
+    """
+    alphas = torch.from_numpy(self.client_data_proportions).to(self.device)
+    log_alphas = alphas.log().clamp_(min=-1e9)
+    deno = torch.logsumexp(log_alphas + logits, dim=-1, keepdim=True)
+    return log_alphas + logits - deno
+
 def get_client_labels(dataset, user_groups, num_workers, num_classes, proportions=False):
     """
     Creates a List containing the set of all labels present in both train and validation sets for each client,
