@@ -148,7 +148,7 @@ class Client(object):
                 if self.args.model == 'vit':
                     logits = logits[0]
                 if self.args.wsm:
-                    logits = wsm(logits)
+                    logits = wsm(logits, self.data_proportions, self.args.device)
                 loss = self.criterion(logits, labels)
 
                 if self.args.accu_split is not None:

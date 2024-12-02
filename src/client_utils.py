@@ -18,15 +18,17 @@ class DatasetSplit(Dataset):
         image, label = self.dataset[self.idxs[item]]
         return torch.tensor(image), torch.tensor(label)
 
-def wsm(logits):
+def wsm(logits, props, device):
     """
     computes softmax weighted by class proportions from the client
     Args:
         logits: logits for the mini batch under consideration
+        props: proportion of labels client has
+        device: cpu or gpu
     Returns:
         softmax weighted by class proportion
     """
-    alphas = torch.from_numpy(self.client_data_proportions).to(self.device)
+    alphas = torch.from_numpy(props).to(device)
     log_alphas = alphas.log().clamp_(min=-1e9)
     deno = torch.logsumexp(log_alphas + logits, dim=-1, keepdim=True)
     return log_alphas + logits - deno
