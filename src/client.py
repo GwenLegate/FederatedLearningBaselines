@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader
 from src.client_utils import DatasetSplit, train_test
 import torch.nn.functional as F
 
-class FedAvgClient(object):
+class Client(object):
     def __init__(self, args, train_dataset, validation_dataset, idx, client_labels, all_client_data):
         self.args = args
         self.client_idx = idx
@@ -110,7 +110,7 @@ class FedAvgClient(object):
             model.zero_grad()
             logits = model(images)
 
-            if self.args.mask:
+            if self.args.wsm:
                 logits = self.weighted_log_softmax(logits)
 
             loss = self.criterion(logits, labels)

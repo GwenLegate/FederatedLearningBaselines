@@ -6,7 +6,7 @@ import copy
 import numpy as np
 import wandb
 import torch
-from src.fedavg_client import FedAvgClient
+from src.client import Client
 from src.utils import (average_params, get_model, load_past_model, run_summary, wandb_setup, zero_last_hundred,
                        last_hundred_update, last_hundred_avg, init_run_dir)
 from src.eval_utils import validation_inference, test_inference, get_validation_ds
@@ -63,7 +63,7 @@ class FedAvgServer(object):
 
             # for each selected client, init model weights with global weights and train lcl model for local_ep epochs
             for idx in idxs_clients:
-                local_model = FedAvgClient(args=self.args, train_dataset=train_dataset, validation_dataset=validation_dataset,
+                local_model = Client(args=self.args, train_dataset=train_dataset, validation_dataset=validation_dataset,
                                           idx=idx, client_labels=client_labels[idx], all_client_data=user_groups)
 
                 deltas, loss, results = local_model.train_client(model=copy.deepcopy(global_model), global_round=self.epoch)
