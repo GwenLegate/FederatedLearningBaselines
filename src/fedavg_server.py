@@ -48,7 +48,7 @@ class FedAvgServer(object):
 
         # set up wandb connection
         if self.args.wandb:
-            wandb_setup(self.args, self.args.model, self.run_dir)
+            wandb_setup(self.args, global_model, self.run_dir)
 
         run_summary(self.args)
 
