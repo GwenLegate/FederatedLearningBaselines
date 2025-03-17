@@ -43,10 +43,12 @@ class FedAvgServer(object):
         # init best acc obtained for model
         val_acc, _ = validation_inference(self.args, global_model, validation_dataset_global, self.args.num_workers)
         best_acc = copy.deepcopy(val_acc)
+        model_path = f'{self.run_dir}/global_model.pt'
+        torch.save(global_model.state_dict(), model_path)
 
         # set up wandb connection
         if self.args.wandb:
-            wandb_setup(self.args, global_model, self.run_dir)
+            wandb_setup(self.args, self.args.model, self.run_dir)
 
         run_summary(self.args)
 
