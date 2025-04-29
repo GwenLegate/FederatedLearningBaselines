@@ -54,7 +54,7 @@ def test_inference(args, model, test_dataset, num_workers):
     model.eval()
     loss, total, correct = 0.0, 0.0, 0.0
     criterion = torch.nn.CrossEntropyLoss().to(args.device)
-    testloader = DataLoader(test_dataset, batch_size=128,
+    testloader = DataLoader(test_dataset, batch_size=args.local_bs,
                             shuffle=False, num_workers=num_workers, pin_memory=True)
 
     for batch_idx, (images, labels) in enumerate(testloader):
