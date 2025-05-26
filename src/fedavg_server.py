@@ -7,8 +7,7 @@ import numpy as np
 import wandb
 import torch
 from src.client import Client
-from src.utils import (average_params, get_model, load_past_model, run_summary, wandb_setup, zero_last_hundred,
-                       last_hundred_update, last_hundred_avg, init_run_dir)
+from src.utils import (average_params, get_model, load_past_model, run_summary, wandb_setup, init_run_dir)
 from src.eval_utils import validation_inference, test_inference, get_validation_ds
 from src.client_utils import get_client_labels
 from src.data_utils import get_dataset, split_dataset
@@ -22,9 +21,6 @@ class FedAvgServer(object):
         self.epoch = 0
 
     def start_server(self):
-        if self.args.eval_over_last_hundred:
-            last_hundred = zero_last_hundred()
-
         # load dataset and model
         train_dataset, validation_dataset, test_dataset = get_dataset(self.args)
         global_model = get_model(self.args)
@@ -91,10 +87,6 @@ class FedAvgServer(object):
                 model_path = f'{self.run_dir}/global_model.pt'
                 torch.save(global_model.state_dict(), model_path)
 
-            if self.args.eval_over_last_hundred and self.args.epochs - (self.epoch + 1) <= 100:
-                test_acc, test_loss = test_inference(self.args, global_model, test_dataset, self.args.num_workers)
-                last_hundred = last_hundred_update(last_hundred, (val_loss, val_acc, test_loss, test_acc))
-
             # log global training loss after every 'i' rounds
             if (self.epoch + 1) % self.args.print_every == 0:
                 if self.args.wandb:
@@ -111,17 +103,12 @@ class FedAvgServer(object):
 
         # Test inference after completion of training
         test_acc, test_loss = test_inference(self.args, global_model, test_dataset, self.args.num_workers)
-        if self.args.eval_over_last_hundred:
-            last_hundred_val_loss, last_hundred_val_acc, last_hundred_test_loss, last_hundred_test_acc  = last_hundred_avg(self.args, last_hundred, val_acc, test_acc)
-            return val_acc, val_loss, test_acc, test_loss, last_hundred_val_acc, last_hundred_val_loss, \
-                   last_hundred_test_acc, last_hundred_test_loss
-        else:
-            if self.args.wandb:
-                wandb.log({'val_acc': val_acc,
-                           'test_acc': test_acc,
-                           })
+        if self.args.wandb:
+            wandb.log({'val_acc': val_acc,
+                       'test_acc': test_acc,
+                       })
 
-            return val_acc, val_loss, test_acc, test_loss
+        return val_acc, val_loss, test_acc, test_loss
 
     def _apply_server_update(self, model, deltas):
         """

@@ -189,26 +189,6 @@ def get_delta(params1, params2):
         params2[k] -= params1[k]
     return params2
 
-def zero_last_hundred():
-    return ([], [], [], [])
-
-def last_hundred_update(last_humdred, acc_and_loss):
-    for arr, val in zip(last_humdred, acc_and_loss):
-        arr.append(val)
-    return last_humdred
-
-def last_hundred_avg(args, last_hundred, val_acc, test_acc):
-    avgs = []
-    for arr in last_hundred:
-        avgs.append(sum(arr)/len(arr))
-    if args.wandb:
-        wandb.log({'val_acc': val_acc,
-                   'test_acc': test_acc,
-                   'last_100_val_acc': avgs[1],
-                   'last_100_test_acc': avgs[3]
-                   })
-    return avgs[0], avgs[1], avgs[2], avgs[3]
-
 def compute_accuracy(model, dataloader, device):
     """
     compute accuracy method from NIID-Bench, kept for consistancy with scaffold implementation

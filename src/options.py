@@ -86,10 +86,6 @@ def args_parser():
     parser.add_argument('--hyperparam_search', type=bool, default=False,
                         help="sets random values within a specified range for a hyper parameter search")
     parser.add_argument('--print_every', type=int, default=20)
-    parser.add_argument('--eval_over_last_hundred', type=int, default=0, help='take final eval as average over last '
-                                                                              'hundred rounds of training. Useful for '
-                                                                              'particularly noisy training.'
-                                                                              ' Default is 0, i.e. false')
 
     args = parser.parse_args()
     return args

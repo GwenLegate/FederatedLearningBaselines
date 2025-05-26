@@ -32,18 +32,8 @@ if __name__ == '__main__':
             set_random_args(args)
 
         validate_args(args)
-        if args.eval_over_last_hundred:
-            val_acc, val_loss, test_acc, test_loss, last_hundred_val_acc, last_hundred_val_loss, last_hundred_test_acc,\
-            last_hundred_test_loss = run_fed(args, args.fed_type)
-            print(f' \n Results after {args.epochs} global rounds of training:')
-            print("|---- Validation Accuracy: {:.2f}%".format(100 * val_acc))
-            print("|---- Test Accuracy: {:.2f}%".format(100 * test_acc))
-            print("|---- Last 100 Validation Accuracy: {:.2f}%".format(100 * last_hundred_val_acc))
-            print("|---- Last 100 Test Accuracy: {:.2f}%".format(100 * last_hundred_test_acc))
-            print('\n Total Run Time: {0:0.4f}'.format(time.time() - start_time))
-        else:
-            val_acc, val_loss, test_acc, test_loss = run_fed(args, args.fed_type)
-            print(f' \n Results after {args.epochs} global rounds of training:')
-            print("|---- Validation Accuracy: {:.2f}%".format(100 * val_acc))
-            print("|---- Test Accuracy: {:.2f}%".format(100 * test_acc))
-            print('\n Total Run Time: {0:0.4f}'.format(time.time() - start_time))
+        val_acc, val_loss, test_acc, test_loss = run_fed(args, args.fed_type)
+        print(f' \n Results after {args.epochs} global rounds of training:')
+        print("|---- Validation Accuracy: {:.2f}%".format(100 * val_acc))
+        print("|---- Test Accuracy: {:.2f}%".format(100 * test_acc))
+        print('\n Total Run Time: {0:0.4f}'.format(time.time() - start_time))
