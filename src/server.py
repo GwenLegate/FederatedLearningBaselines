@@ -6,14 +6,14 @@ import copy
 import numpy as np
 import wandb
 import torch
-from torch.optim import Adam
 from src.client import Client
-from src.utils import average_params, get_model, load_past_model, run_summary, wandb_setup, init_run_dir
+from src.utils import (average_params, get_model, load_past_model, run_summary, wandb_setup, init_run_dir)
 from src.eval_utils import validation_inference, test_inference, get_validation_ds
 from src.client_utils import get_client_labels
 from src.data_utils import get_dataset, split_dataset
+from src.optimizer import get_optimizer
 
-class FedAdamServer(object):
+class Server(object):
     def __init__(self, args):
         self.args = args
         self.run_dir = init_run_dir(args, 'CC')
@@ -22,10 +22,10 @@ class FedAdamServer(object):
         self.epoch = 0
 
     def start_server(self):
-        # load dataset and model and optimizer
+        # load dataset and init model and optimizer
         train_dataset, validation_dataset, test_dataset = get_dataset(self.args)
         global_model = get_model(self.args)
-        optimizer = Adam(global_model.parameters(), lr=self.args.server_lr, betas=(self.args.beta1, self.args.beta2), weight_decay=1e-5, eps=self.args.adam_eps)
+        optimizer = get_optimizer(self.args, global_model)
 
         if len(self.args.continue_train) > 0:
             global_model, user_groups = load_past_model(self.args, global_model)
@@ -34,7 +34,7 @@ class FedAdamServer(object):
             user_groups_to_save = f'{self.run_dir}/user_groups.pt'
             torch.save(user_groups, user_groups_to_save)
 
-        # get validation ds by combining indicies for validation sets of each client
+        # get validation ds by combining indices for validation sets of each client
         client_labels = get_client_labels(train_dataset, user_groups, self.args.num_workers, self.args.num_classes)
         validation_dataset_global = get_validation_ds(self.args.num_clients, user_groups, validation_dataset)
 
@@ -62,10 +62,10 @@ class FedAdamServer(object):
             # for each selected client, init model weights with global weights and train lcl model for local_ep epochs
             for idx in idxs_clients:
                 local_model = Client(args=self.args, train_dataset=train_dataset, validation_dataset=validation_dataset,
-                                     idx=idx, client_labels=client_labels[idx], all_client_data=user_groups)
+                                          idx=idx, client_labels=client_labels[idx], all_client_data=user_groups)
 
-                deltas, loss, results = local_model.train_client(model=copy.deepcopy(global_model), global_round=self.epoch)
-                local_deltas.append(copy.deepcopy(deltas))
+                delta, loss, results = local_model.train_client(model=copy.deepcopy(global_model), global_round=self.epoch)
+                local_deltas.append(copy.deepcopy(delta))
                 local_losses.append(copy.deepcopy(loss))
 
             loss_avg = sum(local_losses) / len(local_losses)
@@ -73,7 +73,7 @@ class FedAdamServer(object):
 
             # update global weights
             global_deltas = average_params(local_deltas)
-            self._apply_adam_server_update(global_model, optimizer, copy.deepcopy(global_deltas))
+            self._apply_server_update(global_model, optimizer, copy.deepcopy(global_deltas))
 
             # Test global model inference on validation set after each round use model save criteria
             val_acc, val_loss = validation_inference(self.args, global_model, validation_dataset_global, self.args.num_workers)
@@ -81,7 +81,6 @@ class FedAdamServer(object):
                   f'\nTraining Loss (average loss of clients evaluated on their own in distribution validation set): {loss_avg}')
 
             if val_acc > best_acc:
-                # save model if it is best acc
                 best_acc = copy.deepcopy(val_acc)
                 model_path = f'{self.run_dir}/global_model.pt'
                 torch.save(global_model.state_dict(), model_path)
@@ -109,7 +108,7 @@ class FedAdamServer(object):
 
         return val_acc, val_loss, test_acc, test_loss
 
-    def _apply_adam_server_update(self, model, optimizer, deltas):
+    def _apply_server_update(self, model, optimizer, deltas):
         model_weights = copy.deepcopy(model.state_dict())
         # update batch statistics if necessary
         for key in model_weights.keys():
@@ -121,12 +120,5 @@ class FedAdamServer(object):
         for name, param in model.named_parameters():
             if param.requires_grad:
                 param.grad = deltas[name]
-
-        optimizer.step(closure=None)
+        optimizer.step()
         optimizer.zero_grad(set_to_none=True)
-
-
-
-
-
-

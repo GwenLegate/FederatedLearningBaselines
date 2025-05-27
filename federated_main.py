@@ -8,16 +8,18 @@ from src.data_utils import dataset_config
 from src.fedavg_server import FedAvgServer
 from src.fedavgm_server import FedAvgMServer
 from src.fedadam_server import FedAdamServer
+from src.server import Server
 
 def run_fed(args, fed_type):
-    if fed_type == 'fedavg':
+    server = Server(args)
+    '''if fed_type == 'fedavg':
         server = FedAvgServer(args)
     elif fed_type == 'fedavgm':
         server = FedAvgMServer(args)
     elif fed_type == 'fedadam':
         server = FedAdamServer(args)
     else:
-        raise ValueError(f'type {fed_type} not implemented')
+        raise ValueError(f'type {fed_type} not implemented')'''
     return server.start_server()
 
 if __name__ == '__main__':
