@@ -13,6 +13,7 @@ import numpy as np
 import multiprocessing as mp
 from src.resnets import ResNet34, ResNet18, ResNet50, ResNet101, ResNet152
 from src.vit import ViTForClassification
+from torchvision.models import swin_b
 
 def init_run_dir(args, my_env=None):
     """
@@ -164,6 +165,8 @@ def get_model(args):
         return ResNet152(args=args)
     elif args.model == 'vit':
         return ViTForClassification(args)
+    elif args.model == 'swin':
+        return swin_b()
     else:
         exit('Error: unrecognized model')
 

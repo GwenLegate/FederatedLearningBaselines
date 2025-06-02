@@ -46,7 +46,7 @@ def args_parser():
 
     # model args
     parser.add_argument('--model', type=str, default='resnet18',
-                        help='model name, options: ResNet18, ResNet34, ResNet50, ResNet101, ResNet152, vit')
+                        help='model name, options: resnet18, resnet34, resnet50, resnet101, resnet152, vit, swin')
     parser.add_argument('--width', type=int, default=2, help='model width factor for ResNets')
     parser.add_argument('--kernel_num', type=int, default=9, help='number of each kind of kernel')
     parser.add_argument('--kernel_sizes', type=str, default='3,4,5',
