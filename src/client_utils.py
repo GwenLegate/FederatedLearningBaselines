@@ -28,7 +28,9 @@ def wsm(logits, props, device):
     Returns:
         softmax weighted by class proportion
     """
-    alphas = torch.from_numpy(props).to(device)
+    # match the logit dtype: props is float64, and letting it promote would silently run the rest of the
+    # forward/backward pass in double precision
+    alphas = torch.as_tensor(props, device=device, dtype=logits.dtype)
     log_alphas = alphas.log().clamp_(min=-1e9)
     deno = torch.logsumexp(log_alphas + logits, dim=-1, keepdim=True)
     return log_alphas + logits - deno

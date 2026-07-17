@@ -4,17 +4,30 @@
 
 import argparse
 
+def str2bool(v):
+    """
+    argparse's type=bool just calls bool() on the string, so '--flag False' evaluates to True.
+    This parses the string as a boolean instead.
+    """
+    if isinstance(v, bool):
+        return v
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    if v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    raise argparse.ArgumentTypeError(f'expected a boolean value, got {v!r}')
+
 def args_parser():
     parser = argparse.ArgumentParser()
     # wandb args
-    parser.add_argument('--wandb', type=bool, default=False, help='enables wandb logging and disables local logfiles')
+    parser.add_argument('--wandb', type=str2bool, default=False, help='enables wandb logging and disables local logfiles')
     parser.add_argument("--wandb_project", type=str, default='', help='specifies wandb project to log to')
     parser.add_argument("--wandb_entity", type=str, default='',
                         help='specifies wandb username to team name where the project resides')
     parser.add_argument("--wandb_run_name", type=str,
                         help="set run name to differentiate runs, if you don't set this wandb will auto generate one")
     # sys args
-    parser.add_argument("--offline", type=bool, default=False, help="set wandb to run in offline mode")
+    parser.add_argument("--offline", type=str2bool, default=False, help="set wandb to run in offline mode")
     parser.add_argument('--num_workers', type=int, default=1, help="how many subprocesses to use for data loading.")
     parser.add_argument('--accu_split', type=int, default=None,
                         help='number of groups to split batch into for gradient accumulation when using very large medels')
@@ -34,6 +47,8 @@ def args_parser():
     parser.add_argument('--server_lr', type=float, default=1,
                         help='learning rate for global model, always 1 for FedAvg version')
     parser.add_argument('--client_lr', type=float, default=0.1, help='learning rate for client models')
+    parser.add_argument('--optimizer', type=str, default='sgd', choices=['sgd', 'adam'],
+                        help='optimizer used for centralized training (see test/test_centralized.py)')
 
     # FedAvgM args
     parser.add_argument('--momentum', type=float, default=0.9, help='SGD momentum, momentum parameter. default is 0.9 ')
@@ -63,8 +78,8 @@ def args_parser():
     parser.add_argument("--hidden_dropout_prob", type=float, default=0.)
     parser.add_argument("--attention_probs_dropout_prob", type=float, default=0.)
     parser.add_argument("--initializer_range", type=float, default=0.02)
-    parser.add_argument("--qkv_bias", type=bool, default=True)
-    parser.add_argument("--use_faster_attention", type=bool, default=True)
+    parser.add_argument("--qkv_bias", type=str2bool, default=True)
+    parser.add_argument("--use_faster_attention", type=str2bool, default=True)
 
     # dataset args
     parser.add_argument("--image_size", type=int, default=32, help='image dimensions')
@@ -81,9 +96,23 @@ def args_parser():
                         Mcmahan(2017) et. al. Default = 1.')
     parser.add_argument('--alpha', type=float, default=0.1, help="alpha of dirichlet, value between 0 and infinity\
                         more homogeneous when higher, more heterogeneous when lower")
+
+    # quantity skew args (unequal amounts of data per client)
+    parser.add_argument('--quantity_skew', type=int, default=0,
+                        help='1 draws each client sample count from a Dirichlet so clients hold unequal amounts of \
+                        data (quantity skew, NIID-Bench Li et. al. 2022), 0 gives every client the same number of \
+                        samples. Independent of --iid/--dirichlet, which control label skew. Default = 0.')
+    parser.add_argument('--quantity_beta', type=float, default=0.5,
+                        help='beta of the Dirichlet over client sample counts, value between 0 and infinity. Sizes \
+                        are more equal when higher, more skewed when lower. Only used when --quantity_skew=1. \
+                        NIID-Bench uses 0.5.')
+    parser.add_argument('--quantity_min_samples', type=int, default=10,
+                        help='every client is guaranteed at least this many samples under quantity skew. \
+                        NIID-Bench uses 10. Must be at least 2 so each client keeps a train and a validation \
+                        sample. Only used when --quantity_skew=1.')
     # Other args
     parser.add_argument('--continue_train', type=str, default='', help="path to model to load to continue training")
-    parser.add_argument('--hyperparam_search', type=bool, default=False,
+    parser.add_argument('--hyperparam_search', type=str2bool, default=False,
                         help="sets random values within a specified range for a hyper parameter search")
     parser.add_argument('--print_every', type=int, default=20)
 
@@ -115,10 +144,25 @@ def validate_args(args):
             raise ValueError(
                  f'number of input channels is set to {args.num_channels}, needs to be 1 for {args.dataset} dataset'
             )
+    # quantity skew
+    if args.quantity_skew:
+        if args.quantity_beta <= 0:
+            raise ValueError(f'--quantity_beta is {args.quantity_beta}, must be > 0')
+        # int(n * 0.9) has to leave at least one training sample, which needs n >= 2
+        if args.quantity_min_samples < 2:
+            raise ValueError(
+                f'--quantity_min_samples is {args.quantity_min_samples}, must be at least 2 so that every client '
+                f'keeps at least one training and one validation sample'
+            )
+
     # for ViT model
-    assert args.hidden_size % args.num_attention_heads == 0, f'num_attention heads ({args.num_attention_heads}) needs to be a multiple of hidden_size ({args.hidden_size})'
-    assert args.intermediate_size == 4 * args.hidden_size, f'hidden_size ({args.hidden_size}) needs to be 4 times the size of intermediate size ({args.intermediate_size})'
-    assert args.patch_size % args.image_size, f'patch size ({args.patch_size}) needs to be a multiple of image size ({args.image_size})'
+    if args.model == 'vit':
+        assert args.hidden_size % args.num_attention_heads == 0, \
+            f'hidden_size ({args.hidden_size}) needs to be a multiple of num_attention_heads ({args.num_attention_heads})'
+        assert args.intermediate_size == 4 * args.hidden_size, \
+            f'intermediate_size ({args.intermediate_size}) needs to be 4 times hidden_size ({args.hidden_size})'
+        assert args.image_size % args.patch_size == 0, \
+            f'image size ({args.image_size}) needs to be a multiple of patch size ({args.patch_size})'
 
 
 

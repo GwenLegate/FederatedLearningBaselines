@@ -20,12 +20,15 @@ if __name__ == "__main__":
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     model = get_model(args).to(device)
     print(f'using device: {device}')
-    wandb_setup(args, model, run_dir)
+    if args.wandb:
+        wandb_setup(args, model, run_dir, central=True)
 
     if args.optimizer == 'sgd':
         optimizer = torch.optim.SGD(model.parameters(), lr=args.client_lr, momentum=0.9, weight_decay=1e-4)
     elif args.optimizer == 'adam':
         optimizer = torch.optim.Adam(model.parameters(), lr=args.client_lr, weight_decay=1e-4)
+    else:
+        raise ValueError(f'unrecognized optimizer {args.optimizer!r}')
 
     # LR decay
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=64, eta_min=1e-5)
@@ -48,6 +51,8 @@ if __name__ == "__main__":
             model.zero_grad()
 
             logits = model(images)
+            if args.model == 'vit':
+                logits = logits[0]
             loss = criterion(logits, labels)
             loss.backward()
             optimizer.step()
@@ -57,14 +62,16 @@ if __name__ == "__main__":
         train_acc, train_loss = test_inference(args, model, train_dataset, args.num_workers)
         test_acc, test_loss = test_inference(args, model, test_dataset, args.num_workers)
         print(f'train_acc: {train_acc}\ntrain_loss: {train_loss}\ntest_acc: {test_acc}\ntest_loss: {test_loss}')
-        wandb.log({'central_train_acc': train_acc,
-                   'central_train_loss': train_loss,
-                   'central_test_acc': test_acc,
-                   'central_test_loss': test_loss}, step=epoch)
+        if args.wandb:
+            wandb.log({'central_train_acc': train_acc,
+                       'central_train_loss': train_loss,
+                       'central_test_acc': test_acc,
+                       'central_test_loss': test_loss}, step=epoch)
         epoch += 1
     print(f'FINAL ACC {args.model}:\n'
         '______________________________________________________________________________________________\n'
         f'train_acc: {train_acc}\ntrain_loss: {train_loss}\ntest_acc: {test_acc}\ntest_loss: {test_loss}\n'
         '______________________________________________________________________________________________\n')
-    wandb.log({'final_central_test_acc': test_acc,
-               'final_central_test_loss': test_loss})
+    if args.wandb:
+        wandb.log({'final_central_test_acc': test_acc,
+                   'final_central_test_loss': test_loss})

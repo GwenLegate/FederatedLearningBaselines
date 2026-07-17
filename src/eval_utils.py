@@ -15,34 +15,44 @@ def get_validation_ds(num_clients, user_groups, validation_dataset):
 
     return DatasetSplit(validation_dataset, idxs_val)
 
+def _run_inference(args, model, dataloader, criterion):
+    """
+    Runs a full pass over dataloader and returns (accuracy, mean loss per batch).
+    """
+    model.eval()
+    loss, total, correct, num_batches = 0.0, 0.0, 0.0, 0
+
+    with torch.no_grad():
+        for images, labels in dataloader:
+            images, labels = images.to(args.device), labels.to(args.device)
+
+            # Inference
+            outputs = model(images)
+            if args.model == 'vit':
+                outputs = outputs[0]
+            loss += criterion(outputs, labels).item()
+            num_batches += 1
+
+            # Prediction
+            _, pred_labels = torch.max(outputs, 1)
+            pred_labels = pred_labels.view(-1)
+            correct += torch.sum(torch.eq(pred_labels, labels)).item()
+            total += len(labels)
+
+    accuracy = correct / total if total else 0.0
+    mean_loss = loss / num_batches if num_batches else 0.0
+    return accuracy, mean_loss
+
 def validation_inference(args, model, validation_dataset, num_workers):
     """
     Returns the validation accuracy and loss.
     """
     model.to(args.device)
     model.eval()
-    loss, total, correct = 0.0, 0.0, 0.0
     criterion = torch.nn.CrossEntropyLoss().to(args.device)
-    valloader = DataLoader(validation_dataset, batch_size=args.local_bs, shuffle=True, num_workers=num_workers, pin_memory=True)
+    valloader = DataLoader(validation_dataset, batch_size=args.local_bs, shuffle=False, num_workers=num_workers, pin_memory=True)
 
-    for batch_idx, (images, labels) in enumerate(valloader):
-        images, labels = images.to(args.device), labels.to(args.device)
-
-        # Inference
-        outputs = model(images)
-        if args.model == 'vit':
-            outputs = outputs[0]
-        batch_loss = criterion(outputs, labels)
-        loss += batch_loss.item()
-
-        # Prediction
-        _, pred_labels = torch.max(outputs, 1)
-        pred_labels = pred_labels.view(-1)
-        correct += torch.sum(torch.eq(pred_labels, labels)).item()
-        total += len(labels)
-
-    accuracy = correct/total
-    loss = loss / (batch_idx + 1)
+    accuracy, loss = _run_inference(args, model, valloader, criterion)
     model.to('cpu')
     return accuracy, loss
 
@@ -52,29 +62,11 @@ def test_inference(args, model, test_dataset, num_workers):
     """
     model.to(args.device)
     model.eval()
-    loss, total, correct = 0.0, 0.0, 0.0
     criterion = torch.nn.CrossEntropyLoss().to(args.device)
     testloader = DataLoader(test_dataset, batch_size=args.local_bs,
                             shuffle=False, num_workers=num_workers, pin_memory=True)
 
-    for batch_idx, (images, labels) in enumerate(testloader):
-        images, labels = images.to(args.device), labels.to(args.device)
-
-        # Inference
-        outputs = model(images)
-        if args.model == 'vit':
-            outputs = outputs[0]
-        batch_loss = criterion(outputs, labels)
-        loss += batch_loss.item()
-
-        # Prediction
-        _, pred_labels = torch.max(outputs, 1)
-        pred_labels = pred_labels.view(-1)
-        correct += torch.sum(torch.eq(pred_labels, labels)).item()
-        total += len(labels)
-
-    accuracy = correct/total
-    loss = loss/batch_idx
+    accuracy, loss = _run_inference(args, model, testloader, criterion)
     model.to('cpu')
     return accuracy, loss
 

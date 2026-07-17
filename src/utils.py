@@ -40,15 +40,42 @@ def init_run_dir(args, my_env=None):
     return run_dir
 
 
-def average_params(w):
+def average_params(w, num_samples=None):
     """
-    Returns the average of the local weights.
+    Returns the weighted average of the local weights (or deltas).
+
+    Weighting each client by its share of the training samples n_k/n is the aggregation specified by FedAvg
+    (McMahan et. al., https://arxiv.org/abs/1602.05629). When every client holds the same number of samples this
+    reduces exactly to the straight mean.
+
+    Args:
+        w: list of state dicts, one per participating client
+        num_samples: list of training sample counts, one per client, in the same order as w. If None, every
+            client is weighted equally.
+    Returns:
+        a state dict of the weighted average, with each entry keeping the dtype it had in w[0]
     """
-    w_avg = copy.deepcopy(w[0])
-    for key in w_avg.keys():
+    if len(w) == 0:
+        raise ValueError('cannot average an empty list of client params')
+
+    if num_samples is None:
+        weights = [1.0 / len(w)] * len(w)
+    else:
+        if len(num_samples) != len(w):
+            raise ValueError(f'got {len(num_samples)} sample counts for {len(w)} clients')
+        total = float(sum(num_samples))
+        if total <= 0:
+            raise ValueError('total number of training samples across selected clients is 0')
+        weights = [float(n) / total for n in num_samples]
+
+    w_avg = {}
+    for key in w[0].keys():
+        # accumulate in float64 then cast back: integer buffers such as num_batches_tracked cannot hold a
+        # weighted sum in place, and float32 params keep a little more precision this way
+        acc = w[0][key].detach().to(torch.float64) * weights[0]
         for i in range(1, len(w)):
-            w_avg[key] += w[i][key]
-        w_avg[key] = torch.div(w_avg[key], len(w))
+            acc += w[i][key].detach().to(torch.float64) * weights[i]
+        w_avg[key] = acc.to(w[0][key].dtype)
     return w_avg
 
 def average_grads(local_grads):
@@ -99,6 +126,8 @@ def run_summary(args):
           f'\tlocal epochs: {args.local_ep}\n'
           f'\tlocal iterations: {args.local_iters}\n'
           f'\talpha: {args.alpha}\n'
+          f'\tquantity skew: {args.quantity_skew}\n'
+          f'\tquantity beta: {args.quantity_beta if args.quantity_skew else "n/a"}\n'
           f'\tnorm: {args.norm}\n'
           f'\tdataset: {args.dataset}')
 
@@ -127,7 +156,6 @@ def wandb_setup(args, model, run_dir, central=False):
             "model": args.model,
             "norm": args.norm,
         }
-        pass
     else:
         general_args = {
             "client learning_rate": args.client_lr,
@@ -142,6 +170,8 @@ def wandb_setup(args, model, run_dir, central=False):
             "local batch size (B)": args.local_bs,
             "dirichlet": args.dirichlet,
             "alpha": args.alpha,
+            "quantity skew": args.quantity_skew,
+            "quantity beta": args.quantity_beta,
             "norm": args.norm,
             "decay": args.decay,
         }
@@ -166,9 +196,9 @@ def get_model(args):
     elif args.model == 'vit':
         return ViTForClassification(args)
     elif args.model == 'swin':
-        return swin_b()
+        return swin_b(num_classes=args.num_classes)
     else:
-        exit('Error: unrecognized model')
+        raise ValueError(f'unrecognized model {args.model!r}')
 
 def load_past_model(args, model):
     # if this run is a continuation of training for a failed run, load previous model and client distributions (and momentum for fedavgm)

@@ -2,7 +2,7 @@ import numpy as np
 from src.femnist_dataset import FEMNIST
 from src.imagenet32 import Imagenet32
 from torchvision import datasets, transforms
-from src.sampling import iid_split, noniid_fedavg_split, noniid_dirichlet_equal_split
+from src.sampling import iid_split, noniid_fedavg_split, noniid_dirichlet_equal_split, dirichlet_client_sizes
 import ssl
 
 
@@ -26,10 +26,10 @@ def dataset_config(args):
         args.image_size = 224
 
 
-def get_num_samples_per_label(self, dataset_labels):
+def get_num_samples_per_label(dataset_labels, num_classes):
     labels = np.array(dataset_labels)
     examples_per_label = []
-    for i in range(self.args.num_classes):
+    for i in range(num_classes):
         examples_per_label.append(int(np.argwhere(labels == i).shape[0]))
     return examples_per_label
 
@@ -121,8 +121,6 @@ def get_dataset(args):
         validation_dataset = Imagenet32(
             f'{data_dir}out_data_train/',
             transform=transforms.Compose([
-                transforms.RandomCrop(32, padding=4),
-                transforms.RandomHorizontalFlip(),
                 transforms.ToTensor(),
                 normalize,
             ]))
@@ -166,18 +164,35 @@ def split_dataset(train_dataset, args):
         'train' and 'validation' which contain the corresponding sample indices for training and validation subsets of
         each clients partition
     '''
+    client_shards = 2
+    # optionally give clients unequal amounts of data (quantity skew), independently of the label skew above
+    client_sizes, client_shard_counts = None, None
+    if args.quantity_skew:
+        if args.iid or args.dirichlet:
+            client_sizes = dirichlet_client_sizes(len(train_dataset), args.num_clients, args.quantity_beta,
+                                                  min_units=args.quantity_min_samples)
+            print(f'Applying quantity skew: client sample counts ~ Dirichlet(beta={args.quantity_beta}), '
+                  f'min {client_sizes.min()} / median {int(np.median(client_sizes))} / max {client_sizes.max()}')
+        else:
+            # shards are a fixed size, so skew the number of shards each client gets instead
+            client_shard_counts = dirichlet_client_sizes(args.num_clients * client_shards, args.num_clients,
+                                                         args.quantity_beta, min_units=1)
+            print(f'Applying quantity skew: client shard counts ~ Dirichlet(beta={args.quantity_beta}), '
+                  f'min {client_shard_counts.min()} / median {int(np.median(client_shard_counts))} / '
+                  f'max {client_shard_counts.max()} shards')
+
     if args.iid:
         # Sample IID user data
-        user_groups = iid_split(train_dataset, args.num_clients)
+        user_groups = iid_split(train_dataset, args.num_clients, client_sizes=client_sizes)
     else:
         if args.dirichlet:
             print(f'Creating non iid client datasets using Dirichlet distribution')
-            user_groups = noniid_dirichlet_equal_split(train_dataset, args.alpha, args.num_clients, args.num_classes)
-            if args.frac_client_samples:
-                user_groups = noniid_dirichlet_equal_split(train_dataset, args.alpha, args.num_clients,
-                                                           args.num_classes, data_subset=args.frac_client_samples)
+            user_groups = noniid_dirichlet_equal_split(train_dataset, args.alpha, args.num_clients,
+                                                       args.num_classes, data_subset=args.frac_client_samples,
+                                                       client_sizes=client_sizes)
         else:
             print(f'Creating non iid client datasets using shards')
-            user_groups = noniid_fedavg_split(train_dataset, args.num_clients, client_shards=2)
+            user_groups = noniid_fedavg_split(train_dataset, args.num_clients, client_shards=client_shards,
+                                              client_shard_counts=client_shard_counts)
 
     return user_groups

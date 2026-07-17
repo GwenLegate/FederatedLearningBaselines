@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # Python version: 3.6
-import os
 import copy
 import numpy as np
 import wandb
@@ -39,8 +38,13 @@ class Server(object):
         validation_dataset_global = get_validation_ds(self.args.num_clients, user_groups, validation_dataset)
 
         # init best acc obtained for model
-        val_acc, _ = validation_inference(self.args, global_model, validation_dataset_global, self.args.num_workers)
+        val_acc, val_loss = validation_inference(self.args, global_model, validation_dataset_global, self.args.num_workers)
         best_acc = copy.deepcopy(val_acc)
+
+        # checkpoint the starting model so a best model always exists to load for testing, even if no
+        # round ever improves on the initial validation accuracy
+        model_path = f'{self.run_dir}/global_model.pt'
+        torch.save(global_model.state_dict(), model_path)
 
         # set up wandb connection
         if self.args.wandb:
@@ -52,6 +56,7 @@ class Server(object):
         while self.epoch < self.args.epochs:
             local_losses = []
             local_deltas = []
+            local_num_samples = []
 
             global_round = f'\n | Global Training Round : {self.epoch + 1} |\n'
             print(global_round)
@@ -67,12 +72,14 @@ class Server(object):
                 delta, loss, results = local_model.train_client(model=copy.deepcopy(global_model), global_round=self.epoch)
                 local_deltas.append(copy.deepcopy(delta))
                 local_losses.append(copy.deepcopy(loss))
+                # n_k for the FedAvg n_k/n aggregation weighting
+                local_num_samples.append(len(user_groups[idx]['train']))
 
             loss_avg = sum(local_losses) / len(local_losses)
             self.train_loss.append(loss_avg)
 
-            # update global weights
-            global_deltas = average_params(local_deltas)
+            # update global weights, weighting each client by its share of the round's training samples
+            global_deltas = average_params(local_deltas, num_samples=local_num_samples)
             self._apply_server_update(global_model, optimizer, copy.deepcopy(global_deltas))
 
             # Test global model inference on validation set after each round use model save criteria
@@ -82,7 +89,6 @@ class Server(object):
 
             if val_acc > best_acc:
                 best_acc = copy.deepcopy(val_acc)
-                model_path = f'{self.run_dir}/global_model.pt'
                 torch.save(global_model.state_dict(), model_path)
 
             # print global training loss after every 'i' rounds
@@ -96,7 +102,6 @@ class Server(object):
             self.epoch += 1
 
         # load best model for testing
-        model_path = f'{self.run_dir}/global_model.pt'
         global_model.load_state_dict(torch.load(model_path))
 
         # Test inference after completion of training

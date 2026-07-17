@@ -25,8 +25,15 @@ class Client(object):
         self.criterion = nn.CrossEntropyLoss().to(self.device)
         # set of all labels (training and validation) in the client dataset
         self.labels = client_labels
-        self.client_data_proportions = self.data_proportions()
+        # computed lazily and cached: it needs a pass over the whole client dataset and is only used by WSM
+        self._client_data_proportions = None
         self.base_model = None
+
+    @property
+    def client_data_proportions(self):
+        if self._client_data_proportions is None:
+            self._client_data_proportions = self.data_proportions()
+        return self._client_data_proportions
 
     def get_base_model(self):
         """
@@ -48,7 +55,7 @@ class Client(object):
         Returns: delta values for all model parmaeters where RequiresGrad=True in a dict
         """
         m = model.to('cpu').state_dict()
-        base_m = self.base_model
+        base_m = copy.deepcopy(self.base_model)
 
         for key in m.keys():
             if 'batches' in key or 'running' in key:
@@ -86,7 +93,6 @@ class Client(object):
         count_client_labels = []
         for i in range(self.args.num_classes):
             count_client_labels.append(int(np.argwhere(client_labels == i).shape[0]))
-        count_labels = np.array(count_labels)
         count_client_labels = np.array(count_client_labels)
 
         return count_client_labels / count_labels
@@ -110,12 +116,16 @@ class Client(object):
             model.zero_grad()
             logits = model(images)
 
+            if self.args.model == 'vit':
+                logits = logits[0]
             if self.args.wsm:
-                logits = wsm(logits)
+                logits = wsm(logits, self.client_data_proportions, self.device)
 
             loss = self.criterion(logits, labels)
             loss.backward()
-            grad_dict = {k:v.grad for k, v in zip(model.state_dict(), model.parameters())}
+            # zip over named_parameters: state_dict also contains buffers, which have no .grad and would
+            # misalign the keys against model.parameters()
+            grad_dict = {k: v.grad for k, v in model.named_parameters()}
             return grad_dict
 
     def train_client(self, model, global_round):
@@ -133,48 +143,51 @@ class Client(object):
         if self.args.decay == 1:
             scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=500, gamma=0.1)
 
+        # number of micro batches whose gradients are accumulated into a single optimizer step
+        accu_split = self.args.accu_split if self.args.accu_split is not None else 1
+
         # counts number of rounds of sgd
         local_iter_count = 0
+        stop_training = False
+        model.zero_grad()
 
         # *** BEGIN TRAINING ***
-        for iter in range(self.args.local_ep):
+        for _ in range(self.args.local_ep):
             batch_loss = []
             for batch_idx, (images, labels) in enumerate(self.trainloader):
-                local_iter_count += 1
                 images, labels = images.to(self.device), labels.to(self.device)
-                model.zero_grad()
 
                 logits = model(images)
                 if self.args.model == 'vit':
                     logits = logits[0]
                 if self.args.wsm:
-                    logits = wsm(logits, self.data_proportions(), self.args.device)
+                    logits = wsm(logits, self.client_data_proportions, self.device)
                 loss = self.criterion(logits, labels)
+                batch_loss.append(loss.item())
 
-                if self.args.accu_split is not None:
-                    if batch_idx % self.args.accu_split == 0:
-                        local_iter_count += 1
-                        loss.backward()
-                        optimizer.step()
-                        if self.args.decay == 1:
-                            scheduler.step()
-                else:
-                    local_iter_count += 1
-                    loss.backward()
+                # scale so the accumulated gradient is the mean over the full effective batch, not the sum
+                (loss / accu_split).backward()
+
+                if (batch_idx + 1) % accu_split == 0:
                     optimizer.step()
+                    model.zero_grad()
+                    local_iter_count += 1
                     if self.args.decay == 1:
                         scheduler.step()
 
-                model.zero_grad()
-                batch_loss.append(loss.item())
-                if self.args.local_iters is not None:
-                    if self.args.local_iters == local_iter_count:
+                    if self.args.local_iters is not None and local_iter_count >= self.args.local_iters:
+                        stop_training = True
                         break
-            epoch_loss.append(sum(batch_loss)/len(batch_loss))
+
+            if batch_loss:
+                epoch_loss.append(sum(batch_loss) / len(batch_loss))
+            if stop_training:
+                break
 
         deltas = self.get_deltas(model)
         model.to('cpu')
-        return deltas, sum(epoch_loss) / len(epoch_loss), optional_eval_results
+        mean_loss = sum(epoch_loss) / len(epoch_loss) if epoch_loss else 0.0
+        return deltas, mean_loss, optional_eval_results
 
     def evaluate_client_model(self, idxs_clients, model):
         """ evaluates an individual client model on the datasets of all other clients selected for this round
@@ -187,34 +200,42 @@ class Client(object):
         model.eval()
 
         for idx in idxs_clients:
-            _, self.testloader = train_test(self.args, self.train_dataset, self.validation_dataset,
-                                            list(self.all_client_data[idx]['train']),
-                                            list(self.all_client_data[idx]['validation']), self.args.num_workers)
-            acc, _ = self.inference(model)
+            _, testloader = train_test(self.args, self.train_dataset, self.validation_dataset,
+                                       list(self.all_client_data[idx]['train']),
+                                       list(self.all_client_data[idx]['validation']), self.args.num_workers)
+            acc, _ = self.inference(model, testloader)
             all_acc.append(acc)
         return all_acc
 
-    def inference(self, model):
+    def inference(self, model, testloader=None):
         """
-        Returns the inference accuracy and loss.
+        Returns the inference accuracy and mean loss, evaluated on this client's own validation set unless
+        another loader is supplied.
         """
+        if testloader is None:
+            testloader = self.testloader
         model.to(self.args.device)
         model.eval()
-        loss, total, correct = 0.0, 0.0, 0.0
-        for batch_idx, (images, labels) in enumerate(self.testloader):
-            images, labels = images.to(self.device), labels.to(self.device)
+        loss, total, correct, num_batches = 0.0, 0.0, 0.0, 0
+        with torch.no_grad():
+            for images, labels in testloader:
+                images, labels = images.to(self.device), labels.to(self.device)
 
-            # Inference
-            outputs = model(images)
-            batch_loss = self.criterion(outputs, labels)
-            loss += batch_loss.item()
+                # Inference
+                outputs = model(images)
+                if self.args.model == 'vit':
+                    outputs = outputs[0]
+                batch_loss = self.criterion(outputs, labels)
+                loss += batch_loss.item()
+                num_batches += 1
 
-            # Prediction
-            _, pred_labels = torch.max(outputs, 1)
-            pred_labels = pred_labels.view(-1)
-            correct += torch.sum(torch.eq(pred_labels, labels)).item()
-            total += len(labels)
+                # Prediction
+                _, pred_labels = torch.max(outputs, 1)
+                pred_labels = pred_labels.view(-1)
+                correct += torch.sum(torch.eq(pred_labels, labels)).item()
+                total += len(labels)
 
-        accuracy = correct / total
+        accuracy = correct / total if total else 0.0
+        mean_loss = loss / num_batches if num_batches else 0.0
         model.to('cpu')
-        return accuracy, loss
+        return accuracy, mean_loss
